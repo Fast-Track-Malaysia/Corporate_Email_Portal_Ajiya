@@ -31,6 +31,7 @@ namespace Web
                 }
             }
             int DocEntry = int.Parse(Request.QueryString["DocEntry"]);
+            string SAPDocNo = Request.QueryString["SAPDocNo"];
             string PortalDocNo = Request.QueryString["PortalDocNo"];
             string CardCode = Request.QueryString["CardCode"];
             string queryMode = Request.QueryString["Mode"];
@@ -39,6 +40,8 @@ namespace Web
             {
                 string layoutName = Session["CompnyCode"].ToString() + "_Invoice";
 
+                #region Xaf report
+                /*
                 xafReport = new XafReport(Session["AjiyaDBConnString"].ToString(), WebConfigurationManager.AppSettings.Get("XafSource"));
                 IObjectSpace objectSpace = xafReport.objectSpaceProvider.CreateObjectSpace();
                 ReportDataV2 reportData = objectSpace.FindObject<ReportDataV2>(CriteriaOperator.Parse("DisplayName=?", WebConfigurationManager.AppSettings.Get("InvoiceDisplayName")));// .FirstOrDefault<ReportDataV2>(data => data.DisplayName == sourcefile);
@@ -64,12 +67,14 @@ namespace Web
                 reportDataSourceHelper.SetupBeforePrint(report, null, op, true, null, false);
                 report.ExportToPdf(ExportPath);
                 xafReport = null;
+                                */
+                #endregion
+
                 #region Crystal report
-                /*
                 ReportDocument crystalReport = new ReportDocument();
 
                 crystalReport.Load(Server.MapPath("~/Reports/" + layoutName + ".rpt"));
-                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(user.SAPDBConnString);
+                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(Session["SAPDBConnString"].ToString());
                 crystalReport.DataSourceConnections[0].SetConnection(builder.DataSource, builder.InitialCatalog, builder.UserID, builder.Password);
 
                 ParameterFieldDefinitions crParameterdef;
@@ -82,14 +87,19 @@ namespace Web
                         crystalReport.SetParameterValue("DocKey@", DocEntry);
                         continue;
                     }
+
+                    if (param.Name.Equals("ObjectId@"))
+                    {
+                        crystalReport.SetParameterValue("ObjectId@", 13);
+                        continue;
+                    }
                 }
 
-                string fileName = "[Preview]_" + DocEntry + "_INV_" + DateTime.Now.ToString("yyyyMMdd") + ".pdf";
+                string fileName = "[Preview]_" + "INV_" + CardCode + "-" + SAPDocNo + ".pdf";
                 string ExportPath = Path.GetTempPath() + fileName;
                 crystalReport.ExportToDisk(ExportFormatType.PortableDocFormat, ExportPath);
                 crystalReport.Dispose();
                 builder.Clear();
-                */
                 #endregion
 
                 if (System.IO.File.Exists(ExportPath))

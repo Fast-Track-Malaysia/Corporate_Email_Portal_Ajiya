@@ -22,7 +22,7 @@ namespace Web
                 Response.Redirect("~/Default.aspx", false);
             }
 
-            if (Page.IsPostBack == false)
+            if (!Page.IsPostBack)
             {
                 //SetChart();
                 BindChart();

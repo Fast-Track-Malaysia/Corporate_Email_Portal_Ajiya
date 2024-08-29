@@ -1,4 +1,4 @@
-﻿<%@ Page Title="Statement Sent Logs" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="EmailReminderLogs.aspx.cs" Inherits="Web.EmailReminderLogs" MaintainScrollPositionOnPostback="true" %>
+﻿<%@ Page Title="Reminder Sent Logs" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="EmailReminderLogs.aspx.cs" Inherits="Web.EmailReminderLogs" MaintainScrollPositionOnPostback="true" %>
 
 <%@ Register Assembly="AjaxControlToolkit" Namespace="AjaxControlToolkit" TagPrefix="ajax" %>
 
@@ -12,6 +12,18 @@
             width: 5%;
             height: 5%;
             z-index: 1001;
+        }
+
+        .fixedWitdhS {
+            overflow-wrap: break-word;
+            text-align: left;
+        }
+
+        .fixedWitdhL {
+            column-width: 150px;
+            max-width: 150px;
+            overflow-wrap: break-word;
+            text-align: left;
         }
     </style>
 
@@ -144,14 +156,14 @@
                                     CommandName="chkboxCheck" />
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="ID" SortExpression="ID" ItemStyle-Width="150px" Visible="false">
+                        <asp:TemplateField HeaderText="ID" SortExpression="ID" Visible="false" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblID" runat="server" Text='<%# Bind("ID") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="CardCode" SortExpression="CardCode">
+                        <asp:TemplateField HeaderText="CardCode" SortExpression="CardCode" ItemStyle-CssClass="fixedWitdhS">
                             <EditItemTemplate>
-                                <asp:TextBox ID="TextBox1" runat="server" Text='<%# Bind("CardCode") %>' ItemStyle-Width="20px"></asp:TextBox>
+                                <asp:TextBox ID="TextBox1" runat="server" Text='<%# Bind("CardCode") %>'></asp:TextBox>
                             </EditItemTemplate>
                             <ItemTemplate>
                                 <asp:Label ID="LabelCardCode" runat="server" Text='<%# Bind("CardCode") %>'></asp:Label>
@@ -167,12 +179,12 @@
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Email To" SortExpression="EmailTo" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Email To" SortExpression="EmailTo" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailTo" runat="server" Text='<%# Bind("EmailTo") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="CC" SortExpression="EmailCC" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="CC" SortExpression="EmailCC" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailCC" runat="server" Text='<%# Bind("EmailCC") %>'></asp:Label>
                             </ItemTemplate>
@@ -237,12 +249,14 @@
                             <ItemTemplate>
                                 <asp:HyperLink ID="LinkView" runat="server" CssClass="btn btn-primary btn-xs"
                                     Target="_blank"
-                                    NavigateUrl='<%# string.Format("~/PreviewReminder.aspx?CardCode={0}&RmdDate={1}&MinAmount={2}&ExceedDaysFr={3}&ExceedDaysTo={4}&LetterType={5}" +
-    "&Mode=View", HttpUtility.UrlEncode(Eval("CardCode").ToString()), HttpUtility.UrlEncode(Eval("ReminderDate").ToString()), decimal.Parse(HttpUtility.UrlEncode(Eval("MinAmt").ToString())), int.Parse(HttpUtility.UrlEncode(Eval("InvDaysFrom").ToString())), int.Parse(HttpUtility.UrlEncode(Eval("InvDaysTo").ToString())), HttpUtility.UrlEncode(Eval("LetterType").ToString())) %>'
+                                    NavigateUrl='<%# string.Format("~/PreviewReminder.aspx?CardCode={0}&RmdDate={1}&MinAmount={2}&ExceedDaysFr={3}&ExceedDaysTo={4}&LetterType={5}&SendDate={6}" +
+    "&Mode=View", HttpUtility.UrlEncode(Eval("CardCode").ToString()), HttpUtility.UrlEncode(Eval("ReminderDate").ToString()), decimal.Parse(HttpUtility.UrlEncode(Eval("MinAmt").ToString())), int.Parse(HttpUtility.UrlEncode(Eval("InvDaysFrom").ToString())), int.Parse(HttpUtility.UrlEncode(Eval("InvDaysTo").ToString())), HttpUtility.UrlEncode(Eval("LetterType").ToString()), 
+    HttpUtility.UrlEncode(Eval("SendDate").ToString())) %>'
                                     Text="Preview" />
                                 <asp:HyperLink ID="LinkDownload" runat="server" CssClass="btn btn-primary btn-xs"
-                                    NavigateUrl='<%# string.Format("~/PreviewReminder.aspx?CardCode={0}&RmdDate={1}&MinAmount={2}&ExceedDaysFr={3}&ExceedDaysTo={4}&LetterType={5}" +
-    "&Mode=Download", HttpUtility.UrlEncode(Eval("CardCode").ToString()), HttpUtility.UrlEncode(Eval("ReminderDate").ToString()), decimal.Parse(HttpUtility.UrlEncode(Eval("MinAmt").ToString())), int.Parse(HttpUtility.UrlEncode(Eval("InvDaysFrom").ToString())), int.Parse(HttpUtility.UrlEncode(Eval("InvDaysTo").ToString())), HttpUtility.UrlEncode(Eval("LetterType").ToString())) %>'
+                                    NavigateUrl='<%# string.Format("~/PreviewReminder.aspx?CardCode={0}&RmdDate={1}&MinAmount={2}&ExceedDaysFr={3}&ExceedDaysTo={4}&LetterType={5}&SendDate={6}" +
+    "&Mode=Download", HttpUtility.UrlEncode(Eval("CardCode").ToString()), HttpUtility.UrlEncode(Eval("ReminderDate").ToString()), decimal.Parse(HttpUtility.UrlEncode(Eval("MinAmt").ToString())), int.Parse(HttpUtility.UrlEncode(Eval("InvDaysFrom").ToString())), int.Parse(HttpUtility.UrlEncode(Eval("InvDaysTo").ToString())), HttpUtility.UrlEncode(Eval("LetterType").ToString()), 
+    HttpUtility.UrlEncode(Eval("SendDate").ToString())) %>'
                                     Text="Download" />
                             </ItemTemplate>
                             <HeaderStyle CssClass="text-center"></HeaderStyle>

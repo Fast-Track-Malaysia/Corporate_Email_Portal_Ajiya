@@ -13,6 +13,18 @@
             height: 5%;
             z-index: 1001;
         }
+
+        .fixedWitdhS {
+            overflow-wrap: break-word;
+            text-align: left;
+        }
+
+        .fixedWitdhL {
+            column-width: 150px;
+            max-width: 150px;
+            overflow-wrap: break-word;
+            text-align: left;
+        }
     </style>
 
     <h1 class="font_bold wrap">E-Mail Receipt</h1>
@@ -20,7 +32,7 @@
     Receipt </h3>
 
     <asp:SqlDataSource CancelSelectOnNullParameter="true" ID="SqlDataSource" runat="server"
-        SelectCommand="SELECT * FROM [FTS_fn_GetBPList_Receipt] (@DateFromStr, @DateToStr, @strFr, @strTo) T0 ORDER BY T0.DocEntry "
+        SelectCommand="SELECT * FROM [FTS_fn_GetBPList_Receipt] (@DateFromStr, @DateToStr, @strFr, @strTo, @strLastSent) T0 ORDER BY T0.DocEntry "
         OnSelected="SqlDataSource_Selected"
         FilterExpression="CardCode LIKE '%{0}%' OR CardName LIKE '%{0}%' OR EmailTo LIKE '%{0}%' OR EmailCC LIKE '%{0}%' OR CONVERT(SAPDocNo,'System.String') = '{0}' ">
         <FilterParameters>
@@ -31,6 +43,7 @@
             <asp:Parameter Name="DateToStr" Type="DateTime" />
             <asp:Parameter Name="strFr" Type="String" />
             <asp:Parameter Name="strTo" Type="String" />
+            <asp:Parameter Name="strLastSent" Type="String" />
         </SelectParameters>
     </asp:SqlDataSource>
 
@@ -80,7 +93,7 @@
                     <asp:Label runat="server">&nbsp;</asp:Label>
                     <asp:TextBox ID="txtCardCodeTo" runat="server" CssClass="form-control input-sm" placeholder="Customer Code To"></asp:TextBox>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <div class="has-feedback">
                         <asp:Label runat="server">&nbsp;</asp:Label>
                         <asp:TextBox ID="txtSearch" runat="server" class="form-control input-sm" placeholder="Press Enter to Search" alt="General Search"></asp:TextBox>
@@ -94,6 +107,16 @@
                         <asp:ListItem Selected="True" Value="Y">Yes</asp:ListItem>
                         <asp:ListItem Value="N">No</asp:ListItem>
                     </asp:DropDownList>
+                </div>
+                <div class="col-md-2">
+                    <div class="has-feedback">
+                        <asp:Label runat="server">&nbsp;</asp:Label>
+                        <asp:DropDownList ID="ddlLastSent" runat="server" CssClass="form-control input-sm" Visible="true">
+                            <asp:ListItem Value="A">All Sent/Not Sent</asp:ListItem>
+                            <asp:ListItem Value="Y">Sent</asp:ListItem>
+                            <asp:ListItem Value="N">Not Sent</asp:ListItem>
+                        </asp:DropDownList>
+                    </div>
                 </div>
             </div>
             </div>
@@ -131,22 +154,22 @@
                                     CommandName="chkboxCheck" />
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Doc Entry" SortExpression="DocEntry" ItemStyle-Width="150px" Visible="false">
+                        <asp:TemplateField HeaderText="Doc Entry" SortExpression="DocEntry" ItemStyle-CssClass="fixedWitdhS" Visible="false">
                             <ItemTemplate>
                                 <asp:Label ID="lblDocEntry" runat="server" Text='<%# Bind("DocEntry") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="SAP Doc No." SortExpression="SAPDocNo" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="SAP Doc No." SortExpression="SAPDocNo" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblSAPDocNo" runat="server" Text='<%# Bind("SAPDocNo") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Posting Date" SortExpression="DocDate" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Posting Date" SortExpression="DocDate" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblDocDate" runat="server" Text='<%# Bind("DocDate") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="CardCode" SortExpression="CardCode">
+                        <asp:TemplateField HeaderText="CardCode" SortExpression="CardCode" ItemStyle-CssClass="fixedWitdhS">
                             <EditItemTemplate>
                                 <asp:TextBox ID="txtCardCode" runat="server" Text='<%# Bind("CardCode") %>' ItemStyle-Width="20px"></asp:TextBox>
                             </EditItemTemplate>
@@ -155,7 +178,7 @@
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="CardName" SortExpression="CardName" ItemStyle-Width="400px">
+                        <asp:TemplateField HeaderText="CardName" SortExpression="CardName" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="CardName" runat="server" Text='<%# Bind("CardName") %>'></asp:Label>
                                 <asp:Label ID="LabelDanger" runat="server" Text="" class="label label-danger wrap font_light"></asp:Label>
@@ -164,19 +187,19 @@
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Email To" SortExpression="EmailTo" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Email To" SortExpression="EmailTo" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailTo" runat="server" Text='<%# Bind("EmailTo") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="CC" SortExpression="EmailCC" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="CC" SortExpression="EmailCC" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailCC" runat="server" Text='<%# Bind("EmailCC") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Last Sent" SortExpression="LastSent" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Last Sent" SortExpression="LastSent" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblLastSent" runat="server" Text='<%# Bind("LastSent") %>'></asp:Label>
                             </ItemTemplate>
@@ -188,7 +211,7 @@
                             <ItemStyle HorizontalAlign="Right" />
                         </asp:BoundField>
 
-                        <asp:TemplateField HeaderText="View" HeaderStyle-CssClass="text-center">
+                        <asp:TemplateField HeaderText="View" HeaderStyle-CssClass="text-center" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:HyperLink ID="LinkView" runat="server" CssClass="btn btn-primary btn-xs"
                                     Target="_blank"

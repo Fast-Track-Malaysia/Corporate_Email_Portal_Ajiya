@@ -12,22 +12,24 @@ namespace Web
     {
         protected void Page_Load(object sender, EventArgs e)
         {
-            if (!Page.IsPostBack)
+            if (Session["UserId"] == null || Session["UserId"].ToString() == "")
             {
-                if (Session["UserId"] == null || Session["UserId"].ToString() == "")
-                {
-                    Response.Redirect("~/Default.aspx", false);
-                }
+                Response.Redirect("~/Default.aspx", false);
+                return;
             }
+
             string cardCode = Request.QueryString["CardCode"];
             string stmtDate = Request.QueryString["StmtDate"];
+            string sendDate = Request.QueryString["SendDate"];
             string currency = Request.QueryString["Currency"];
             string queryMode = Request.QueryString["Mode"];
             if (cardCode != null)
             {
 
                 DateTime statementdate = DateTime.ParseExact(stmtDate, "dd/MM/yyyy", null);
+                DateTime senddate = DateTime.ParseExact(sendDate, "dd/MM/yyyy hh:mm tt", null);
                 string stmtDateStr = statementdate.ToString("yyyy-MM-dd");
+                string sendDateStr = senddate.ToString("yyyy-MM-dd hh:mm:ss tt");
                 string layoutName = Session["CompnyCode"].ToString() + "_Statement";
 
 
@@ -59,8 +61,14 @@ namespace Web
                         crystalReport.SetParameterValue("IncludeNoBal", true);
                         continue;
                     }
+
+                    if (param.Name.Equals("PrintDate"))
+                    {
+                        crystalReport.SetParameterValue("PrintDate", sendDateStr);
+                        continue;
+                    }
                 }
-                
+
                 string fileName = "[Preview]_" + "SOA_" + cardCode + "_" + statementdate.ToString("yyyyMMdd") + ".pdf";
                 string ExportPath = Path.GetTempPath() + fileName;
                 crystalReport.ExportToDisk(ExportFormatType.PortableDocFormat, ExportPath);
@@ -85,11 +93,11 @@ namespace Web
                         Response.AddHeader("Content-Disposition", "attachment; filename=" + fileInfo.Name);
                         Response.AddHeader("Content-Length", fileInfo.Length.ToString());
 
-                
+
                         Response.ContentType = "application/pdf";
                         Response.BinaryWrite(Buffer);
 
-                        Response.Flush();                 
+                        Response.Flush();
                         Response.Close();
 
                     }

@@ -5,6 +5,7 @@ using iTextSharp.text;
 using iTextSharp.text.pdf;
 using Security;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -45,6 +46,7 @@ namespace Web
         protected static string statementdateStr = "";
         protected static string strFr = "";
         protected static string strTo = "";
+        protected static string strLastSent = "";
         protected static string query = "";
 
         protected void Page_Load(object sender, EventArgs e)
@@ -53,6 +55,7 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
             else
             {
@@ -72,6 +75,9 @@ namespace Web
                 dt = null;
                 GridView1.DataSource = null;
                 GridView1.DataBind();
+
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
 
@@ -88,14 +94,14 @@ namespace Web
                 Label LabelEmailCC = (Label)row.FindControl("lblEmailCC");
                 CheckBox chkBox = (CheckBox)row.FindControl("chkBox");
 
-                StatementSelectedRow.Add(new StatementSelectedRow 
-                { 
-                    CardCode = LabelCardcode.Text, 
-                    CardName = LabelCardName.Text, 
-                    EmailTo = LabelEmailTo.Text, 
+                StatementSelectedRow.Add(new StatementSelectedRow
+                {
+                    CardCode = LabelCardcode.Text,
+                    CardName = LabelCardName.Text,
+                    EmailTo = LabelEmailTo.Text,
                     EmailCC = LabelEmailCC.Text,
                     isChecked = chkBox.Checked
-                }) ;
+                });
 
                 LabelInfo.Text = "Selected : " + StatementSelectedRow.Count();
             }
@@ -107,10 +113,10 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
 
-            warning = "";
-            info = "Search...";      
+            info = "Search...";
             ft_logs.WriteLine("Perform search for statement date " + txtStatementDate.Text, "Info");
             init();
             StatementSelectedRow.Clear();
@@ -121,10 +127,12 @@ namespace Web
                 statementdateStr = statementdate.ToString("yyyyMMdd");
                 strFr = txtCardCodeFr.Text.Equals("") ? "*" : txtCardCodeFr.Text;
                 strTo = txtCardCodeTo.Text.Equals("") ? "*" : txtCardCodeTo.Text;
+                strLastSent = ddlLastSent.SelectedValue.Equals("") ? "A" : ddlLastSent.SelectedValue;
 
                 SqlDataSource.SelectParameters.Add("statementdateStr", statementdateStr);
                 SqlDataSource.SelectParameters.Add("strFr", strFr);
                 SqlDataSource.SelectParameters.Add("strTo", strTo);
+                SqlDataSource.SelectParameters.Add("strLastSent", strLastSent);
 
                 LabelStmtDate.Text = " as at " + txtStatementDate.Text;
 
@@ -134,7 +142,7 @@ namespace Web
                 {
                     using (SqlDataAdapter dat = new SqlDataAdapter("", conn))
                     {
-                        query = "SELECT * FROM [FTS_fn_GetBPList_Statement] ('" + statementdateStr + "', '" + strFr + "', '" + strTo + "') T0 ORDER BY T0.CardCode ";
+                        query = "SELECT * FROM [FTS_fn_GetBPList_Statement] ('" + statementdateStr + "', '" + strFr + "', '" + strTo + "', '" + strLastSent + "') T0 ORDER BY T0.CardCode ";
 
                         dat.SelectCommand.CommandText = query;
                         SqlDataSource.SelectCommand = query;
@@ -173,6 +181,7 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
 
             init();
@@ -183,11 +192,13 @@ namespace Web
             }
 
             Timer1.Enabled = true;
-            btnSend.Enabled = false;
             imgLoading.Visible = true;
             info = "App starting...";
             try
             {
+                btnSend.Enabled = false;
+                btnSearch.Enabled = false;
+
                 Thread workerThread = new Thread(new ThreadStart(MainTask));
                 workerThread.Start();
             }
@@ -195,6 +206,11 @@ namespace Web
             {
                 LabelDanger.Text = ex.Message;
                 info = ex.Message;
+            }
+            finally
+            {
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void Timer1_Tick(object sender, EventArgs e)
@@ -249,14 +265,15 @@ namespace Web
             ft_logs.WriteLine("Generate statement begin...", "Info");
             DateTime statementdate = DateTime.ParseExact(txtStatementDate.Text, "dd/MM/yyyy", null);
             string statementdateStr = statementdate.ToString("yyyyMMdd");
+            string senddateStr = DateTime.Today.ToString("yyyyMMdd");
             string layoutName = LabelCompany.Text + "_Statement";
 
             folderDir = "C:\\EmailPortal\\[" + LabelCompany.Text + "] " + lblUser.Text + "\\Statement\\" + statementdate.ToString("dd-MM-yyyy");
 
             try
-            { 
+            {
                 ft_logs.WriteLine("① Clear attachment folder...", "Info");
-                foreach (string CardCode in StatementSelectedRow.Select( x => x.CardCode).Distinct())
+                foreach (string CardCode in StatementSelectedRow.Select(x => x.CardCode).Distinct())
                 {
                     string path = folderDir + "\\" + CardCode + "\\";
                     if (Directory.Exists(path))
@@ -267,8 +284,7 @@ namespace Web
             }
             catch (IOException ex)
             {
-                info = "Clear attachment error:" + ex.Message;
-                LabelDanger.Text = info;
+                LabelDanger.Text = "Clear attachment error:" + ex.Message;
                 ft_logs.WriteLine(info, "Error");
                 return;
             }
@@ -326,6 +342,12 @@ namespace Web
                             if (param.Name.Equals("IncludeNoBal"))
                             {
                                 crystalReport.SetParameterValue("IncludeNoBal", true);
+                                continue;
+                            }
+
+                            if (param.Name.Equals("PrintDate"))
+                            {
+                                crystalReport.SetParameterValue("PrintDate", DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt"));
                                 continue;
                             }
                         }
@@ -413,10 +435,14 @@ namespace Web
 
                     string subject = envelope.EmailSubject;
                     subject = subject.Replace(@"[CardName]", CardName);
+                    subject = subject.Replace(@"[DD]", statementdate.ToString("dd"));
+                    subject = subject.Replace(@"[MM]", statementdate.ToString("MM"));
                     subject = subject.Replace(@"[MMM]", statementdate.ToString("MMM"));
                     subject = subject.Replace(@"[YYYY]", statementdate.ToString("yyyy"));
 
                     string content = envelope.EmailContent;
+                    content = content.Replace(@"[DD]", statementdate.ToString("dd"));
+                    content = content.Replace(@"[MM]", statementdate.ToString("MM"));
                     content = content.Replace(@"[MMM]", statementdate.ToString("MMM"));
                     content = content.Replace(@"[YYYY]", statementdate.ToString("yyyy"));
 
@@ -457,6 +483,28 @@ namespace Web
                             }
                         }
 
+                        if (oMail.Attachments.Count <= 0)
+                        {
+                            using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
+                            {
+                                string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
+                                "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
+                                "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
+                                statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
+                                Session["UserId"].ToString() + "', 'Failed', '" + "No attachment." + "');";
+
+                                SqlCommand command = new SqlCommand(query, connection);
+                                command.Connection.Open();
+                                command.ExecuteNonQuery();
+                                command.Connection.Close();
+
+                            }
+                            LabelDanger.Text = "Send E-Mail Error:" + "No attachment.";
+                            ft_logs.WriteLine(Environment.NewLine + info, "Error");
+
+                            continue;
+                        }
+
                         SmtpClient oSTMP = new SmtpClient();
                         oSTMP.Host = smtp;
                         oSTMP.Port = int.Parse(port);
@@ -472,7 +520,7 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
                             statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
                             Session["UserId"].ToString() + "', 'Success', '');";
 
@@ -488,7 +536,7 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
                             statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
                             Session["UserId"].ToString() + "', 'Failed', '" + ex.Message + "');";
 
@@ -498,13 +546,13 @@ namespace Web
                             command.Connection.Close();
 
                         }
-                        info = "Send E-Mail Error:" + ex.Message;
-                        LabelDanger.Text = info;
+                        LabelDanger.Text = "Send E-Mail Error:" + ex.Message;
                         ft_logs.WriteLine(Environment.NewLine + info, "Error");
                         inProcess = false;
                     }
                 }
             }
+            inProcess = false;
             ft_logs.WriteLine("✉ Send E-Mail ended!", "Info");
         }
 
@@ -655,8 +703,9 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
-
+                return;
             }
+
             CheckBox chk = (CheckBox)sender;
             int selRowIndex = int.Parse(chk.Attributes["CommandArgument"]);
             string cardcode = GridView1.DataKeys[selRowIndex]["CardCode"].ToString();
@@ -666,20 +715,23 @@ namespace Web
 
             if (chk.Checked)
             {
-                StatementSelectedRow.Add( new StatementSelectedRow { 
-                    CardCode = cardcode, 
-                    CardName = cardname.Text, 
-                    EmailTo = emailto.Text, 
-                    EmailCC = emailcc.Text, 
-                    isChecked = chk.Checked });
+                StatementSelectedRow.Add(new StatementSelectedRow
+                {
+                    CardCode = cardcode,
+                    CardName = cardname.Text,
+                    EmailTo = emailto.Text,
+                    EmailCC = emailcc.Text,
+                    isChecked = chk.Checked
+                });
             }
             else
             {
-                StatementSelectedRow.RemoveAll( x => x.CardCode == cardcode);
+                StatementSelectedRow.RemoveAll(x => x.CardCode == cardcode);
             }
             StatementSelectedRow.Select(x => x.CardCode).Distinct();
             LabelInfo.Text = "Selected : " + StatementSelectedRow.Count();
         }
+
         // -- Web Page Rendering -----------------------------------------------------------------------
         protected void SqlDataSource_Selected(object sender, SqlDataSourceStatusEventArgs e)
         {
@@ -788,10 +840,15 @@ namespace Web
             if (e.Row.RowType == DataControlRowType.Pager)
             {
                 DropDownList DDL = new DropDownList();
-                DDL.Items.Add("5");
                 DDL.Items.Add("10");
-                DDL.Items.Add("15");
                 DDL.Items.Add("20");
+                DDL.Items.Add("30");
+                DDL.Items.Add("40");
+                DDL.Items.Add("50");
+                DDL.Items.Add("60");
+                DDL.Items.Add("70");
+                DDL.Items.Add("80");
+                DDL.Items.Add("90");
                 DDL.Items.Add("100");
                 DDL.AutoPostBack = true;
                 DDL.SelectedValue = GridView1.PageSize.ToString();
@@ -832,9 +889,9 @@ namespace Web
                 string cardcode = LabelCardcode.Text.Trim();
 
                 // ChkBox Rendering
-                if (StatementSelectedRow.Exists( x => x.CardCode == cardcode) && !chkBox.Enabled)
+                if (StatementSelectedRow.Exists(x => x.CardCode == cardcode) && !chkBox.Enabled)
                 {
-                    StatementSelectedRow.RemoveAll( x => x.CardCode == cardcode);
+                    StatementSelectedRow.RemoveAll(x => x.CardCode == cardcode);
                     StatementSelectedRowAll.RemoveAll(x => x.CardCode == cardcode);
                     chkBox.Checked = false;
                 }
@@ -871,7 +928,6 @@ namespace Web
         }
         protected void refresh()
         {
-
             DateTime statementdate = DateTime.ParseExact(txtStatementDate.Text, "dd/MM/yyyy", null);
             string statementdateStr = statementdate.ToString("yyyyMMdd");
             // Special For SSB

@@ -69,7 +69,6 @@ namespace Web
 
             if (!Page.IsPostBack)
             {
-
                 lblUser.Text = Session["UserId"].ToString();
 
                 txtSendDateFr.Text = DateTime.Now.ToString("dd/MM/yyyy");
@@ -80,6 +79,9 @@ namespace Web
                 dt = null;
                 GridView1.DataSource = null;
                 GridView1.DataBind();
+
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void btnSelect_Click(object sender, EventArgs e)
@@ -174,7 +176,7 @@ namespace Web
                 {
                     using (SqlDataAdapter dat = new SqlDataAdapter("", conn))
                     {
-                        query = "SELECT * FROM [FTS_fn_InvoiceLogs] ('" + senddateFrStr + "', '" + senddateToStr + "', '"+ dateFrStr + "', '"+ dateToStr + "', '" + strFr + "', '" + strTo + "', '" + sendResult + "') T0 ORDER BY T0.SendDate DESC, T0.DocEntry ";
+                        query = "SELECT * FROM [FTS_fn_InvoiceLogs] ('" + senddateFrStr + "', '" + senddateToStr + "', '"+ dateFrStr + "', '"+ dateToStr + "', '" + strFr + "', '" + strTo + "', '" + sendResult + "') T0 ORDER BY T0.SendDate DESC, T0.PortalDocNum ";
 
                         dat.SelectCommand.CommandText = query;
                         SqlDataSource.SelectCommand = query;
@@ -223,11 +225,13 @@ namespace Web
             }
 
             Timer1.Enabled = true;
-            btnSend.Enabled = false;
             imgLoading.Visible = true;
             info = "App starting...";
             try
             {
+                btnSend.Enabled = false;
+                btnSearch.Enabled = false;
+
                 Thread workerThread = new Thread(new ThreadStart(MainTask));
                 workerThread.Start();
             }
@@ -235,6 +239,11 @@ namespace Web
             {
                 LabelDanger.Text = ex.Message;
                 info = ex.Message;
+            }
+            finally
+            {
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void btnRefresh_Click(object sender, EventArgs e)
@@ -330,6 +339,7 @@ namespace Web
                     {
                         string ID = LInvoiceSelectedRow[i].ID.ToString();
                         int DocEntry = LInvoiceSelectedRow[i].DocEntry;
+                        string DocNum = LInvoiceSelectedRow[i].DocNum;
                         int PortalOid = LInvoiceSelectedRow[i].PortalOid;
                         string PortalDocNum = LInvoiceSelectedRow[i].PortalDocNum;
                         string invoicedateStr = LInvoiceSelectedRow[i].InvoiceDate.ToString("yyyy-MM-dd");
@@ -349,6 +359,8 @@ namespace Web
                         Regex r = new Regex(string.Format("[{0}]", Regex.Escape(regexSearch)));
                         CardName = r.Replace(CardName, "");
 
+                        #region XAF report
+                        /*
                         xafReport = new XafReport(Session["AjiyaDBConnString"].ToString(), WebConfigurationManager.AppSettings.Get("XafSource"));
                         IObjectSpace objectSpace = xafReport.objectSpaceProvider.CreateObjectSpace();
                         ReportDataV2 reportData = objectSpace.FindObject<ReportDataV2>(CriteriaOperator.Parse("DisplayName=?", WebConfigurationManager.AppSettings.Get("InvoiceDisplayName")));// .FirstOrDefault<ReportDataV2>(data => data.DisplayName == sourcefile);
@@ -373,13 +385,16 @@ namespace Web
                         reportDataSourceHelper.SetupBeforePrint(report, null, op, true, null, false);
                         report.ExportToPdf(ExportPath);
                         xafReport = null;
+                        */
+                        #endregion
+
                         #region Crystal report
-                        /*
+
                         ReportDocument crystalReport = new ReportDocument();
                         crystalReport.Load(Server.MapPath("~/Reports/" + layoutName + ".rpt"));
 
-                        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(user.ConnString);
-                        crystalReport.DataSourceConnections[0].SetConnection(builder.DataSource, user.SAPDB, builder.UserID, builder.Password);
+                        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(Session["SAPDBConnString"].ToString());
+                        crystalReport.DataSourceConnections[0].SetConnection(builder.DataSource, builder.InitialCatalog, builder.UserID, builder.Password);
 
                         ParameterFieldDefinitions crParameterdef;
                         crParameterdef = crystalReport.DataDefinition.ParameterFields;
@@ -391,13 +406,19 @@ namespace Web
                                 crystalReport.SetParameterValue("DocKey@", DocEntry);
                                 continue;
                             }
+
+                            if (param.Name.Equals("ObjectId@"))
+                            {
+                                crystalReport.SetParameterValue("ObjectId@", 13);
+                                continue;
+                            }
                         }
 
-                        string ExportPath = path + CardCode + "_LINV_" + invoicedateStr + ".pdf";
+                        string ExportPath = path + "LINV_" + CardCode + "_" + DocNum + ".pdf";
                         crystalReport.ExportToDisk(ExportFormatType.PortableDocFormat, ExportPath);
                         docPath.Add(ExportPath);
                         crystalReport.Dispose();
-                        */
+                     
                         #endregion
 
                         ft_logs.WriteLine(" Folder:[" + ExportPath + "]", "");
@@ -450,19 +471,25 @@ namespace Web
                     string to = linvoiceSelectedObj.EmailTo;
                     string cc = linvoiceSelectedObj.EmailCC;
 
-                    info = "④ Sending Invoice [" + (i + 1).ToString() + "/" + LInvoiceSelectedRow.Count() + "] ➜ [" + CardCode + "-" + CardName + "-" + PortalDocNum + "] TO: [" + to + "] CC: [" + cc + "]";
+                    info = "④ Sending Invoice [" + (i + 1).ToString() + "/" + LInvoiceSelectedRow.Count() + "] ➜ [" + CardCode + "-" + CardName + "-" + DocNum + "] TO: [" + to + "] CC: [" + cc + "]";
                     ft_logs.Write(info, "Info");
 
                     string subject = linvoiceSelectedObj.EmailSubject;
                     subject = subject.Replace(@"[CardName]", CardName);
                     subject = subject.Replace(@"[DD]", DocDate.ToString("dd"));
+                    subject = subject.Replace(@"[MM]", DocDate.ToString("MM"));
                     subject = subject.Replace(@"[MMM]", DocDate.ToString("MMM"));
                     subject = subject.Replace(@"[YYYY]", DocDate.ToString("yyyy"));
+                    subject = subject.Replace(@"[InvoiceNo]", PortalDocNum);
+                    subject = subject.Replace(@"[DocNum]", DocNum);
 
                     string content = linvoiceSelectedObj.EmailContent;
                     content = content.Replace(@"[DD]", DocDate.ToString("dd"));
+                    content = content.Replace(@"[MM]", DocDate.ToString("MM"));
                     content = content.Replace(@"[MMM]", DocDate.ToString("MMM"));
                     content = content.Replace(@"[YYYY]", DocDate.ToString("yyyy"));
+                    content = content.Replace(@"[InvoiceNo]", PortalDocNum);
+                    content = content.Replace(@"[DocNum]", DocNum);
 
                     string path = "";
 
@@ -501,6 +528,29 @@ namespace Web
                             }
                         }
 
+                        if (oMail.Attachments.Count <= 0)
+                        {
+                            using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
+                            {
+                                string query = "INSERT INTO ft_email_logs_invoice (DocEntry, DocNum, PortalOid, PortalDocNum, CardCode, CardName, EmailTo, EmailCC, " +
+                                "EmailSubject, EmailContent, InvoiceDate, SendDate, SendBy, SendResult, ErrorDesc) " +
+                                "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + PortalOid + "', '" + PortalDocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
+                                subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Failed', '" +
+                                "No attachment." + "');";
+
+                                SqlCommand command = new SqlCommand(query, connection);
+                                command.Connection.Open();
+                                command.ExecuteNonQuery();
+                                command.Connection.Close();
+                            }
+
+                            info = "Send E-Mail Error:" + "No attachment.";
+                            LabelDanger.Text = info;
+                            ft_logs.WriteLine(Environment.NewLine + info, "Error");
+
+                            continue;
+                        }
+
                         SmtpClient oSTMP = new SmtpClient();
                         oSTMP.Host = smtp;
                         oSTMP.Port = int.Parse(port);
@@ -510,14 +560,14 @@ namespace Web
                         oSTMP.Dispose();
                         oMail.Attachments.Dispose();
 
-                        ft_logs.WriteLine("➜✉ E-Mail Sent " + CardCode + "-" + CardName + "-" + PortalDocNum + " @ " + DateTime.Today.ToString("d MMM"), "");
+                        ft_logs.WriteLine("➜✉ E-Mail Sent " + CardCode + "-" + CardName + "-" + DocNum + " @ " + DateTime.Today.ToString("d MMM"), "");
 
                         using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
                         {
                             string query = "INSERT INTO ft_email_logs_invoice (DocEntry, DocNum, PortalOid, PortalDocNum, CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, InvoiceDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '"+ PortalOid + "', '" + PortalDocNum + "', '" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" +
-                            subject + "', '" + content + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Success', '');";
+                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '"+ PortalOid + "', '" + PortalDocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
+                            subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Success', '');";
 
                             SqlCommand command = new SqlCommand(query, connection);
                             command.Connection.Open();
@@ -531,8 +581,8 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_invoice (DocEntry, DocNum, PortalOid,PortalDocNum, CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, InvoiceDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '"+ PortalOid + "', '" + PortalDocNum + "', '" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" +
-                            subject + "', '" + content + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Failed', '" +
+                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '"+ PortalOid + "', '" + PortalDocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
+                            subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Failed', '" +
                             ex.Message + "');";
 
                             SqlCommand command = new SqlCommand(query, connection);
@@ -548,6 +598,7 @@ namespace Web
                     }
                 }
             }
+            inProcess = false;
             ft_logs.WriteLine("✉ Send E-Mail ended!", "Info");
         }
         protected void chkAll_CheckedChanged(object sender, EventArgs e)
@@ -737,10 +788,15 @@ namespace Web
             if (e.Row.RowType == DataControlRowType.Pager)
             {
                 DropDownList DDL = new DropDownList();
-                DDL.Items.Add("5");
                 DDL.Items.Add("10");
-                DDL.Items.Add("15");
                 DDL.Items.Add("20");
+                DDL.Items.Add("30");
+                DDL.Items.Add("40");
+                DDL.Items.Add("50");
+                DDL.Items.Add("60");
+                DDL.Items.Add("70");
+                DDL.Items.Add("80");
+                DDL.Items.Add("90");
                 DDL.Items.Add("100");
                 DDL.AutoPostBack = true;
                 DDL.SelectedValue = GridView1.PageSize.ToString();

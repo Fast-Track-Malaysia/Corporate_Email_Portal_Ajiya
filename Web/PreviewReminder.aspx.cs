@@ -12,25 +12,27 @@ namespace Web
     {
         protected void Page_Load(object sender, EventArgs e)
         {
-            if (!Page.IsPostBack)
+            if (Session["UserId"] == null || Session["UserId"].ToString() == "")
             {
-                if (Session["UserId"] == null || Session["UserId"].ToString() == "")
-                {
-                    Response.Redirect("~/Default.aspx", false);
-                }
+                Response.Redirect("~/Default.aspx", false);
+                return;
             }
+    
             string cardCode = Request.QueryString["CardCode"];
             string rmdDate = Request.QueryString["RmdDate"];
             string minAmount = Request.QueryString["MinAmount"];
             string exceedDaysFr = Request.QueryString["ExceedDaysFr"];
             string exceedDaysTo = Request.QueryString["ExceedDaysTo"];
             string letterType = Request.QueryString["LetterType"];
+            string sndDate = Request.QueryString["SendDate"];
             string queryMode = Request.QueryString["Mode"];
 
             if (cardCode != null)
             {
-                DateTime reminderdate = DateTime.ParseExact(rmdDate, "yyyy-MM-dd", null);
+                DateTime reminderdate = DateTime.ParseExact(rmdDate, "dd/MM/yyyy", null);
+                DateTime senddate = DateTime.ParseExact(sndDate, "dd/MM/yyyy hh:mm tt", null);
                 string rmdDateStr = reminderdate.ToString("yyyy-MM-dd");
+                string sndDateStr = senddate.ToString("yyyy-MM-dd");
                 string layoutName = Session["CompnyCode"].ToString() + "_Reminder";
 
 
@@ -78,6 +80,12 @@ namespace Web
                     if (param.Name.Equals("CardCode@FROM OCRD WHERE CardType = 'C'"))
                     {
                         crystalReport.SetParameterValue("CardCode@FROM OCRD WHERE CardType = 'C'", cardCode);
+                        continue;
+                    }
+
+                    if (param.Name.Equals("PrintDate"))
+                    {
+                        crystalReport.SetParameterValue("PrintDate", sndDateStr);
                         continue;
                     }
                 }

@@ -60,7 +60,6 @@ namespace Web
 
             if (!Page.IsPostBack)
             {
-
                 lblUser.Text = Session["UserId"].ToString();
 
                 txtSendDateFr.Text = DateTime.Now.ToString("dd/MM/yyyy");
@@ -71,6 +70,9 @@ namespace Web
                 dt = null;
                 GridView1.DataSource = null;
                 GridView1.DataBind();
+
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
 
@@ -89,6 +91,7 @@ namespace Web
                 Label LabelEmailSubject = (Label)row.FindControl("lblEmailSubject");
                 Label LabelEmailContent = (Label)row.FindControl("lblEmailContent");
                 Label LabelStatementDate = (Label)row.FindControl("lblStatementDate");
+                Label LabelSendDate = (Label)row.FindControl("lblSendDate");
                 CheckBox chkBox = (CheckBox)row.FindControl("chkBox");
 
                 LStatementSelectedRow.Add(new LStatementSelectedRow
@@ -101,6 +104,7 @@ namespace Web
                     EmailSubject = LabelEmailSubject.Text,
                     EmailContent = LabelEmailContent.Text,
                     StatementDate = DateTime.ParseExact(LabelStatementDate.Text, "dd/MM/yyyy", null),
+                    SendDate = DateTime.ParseExact(LabelSendDate.Text, "dd/MM/yyyy hh:mm tt", null),
                     isChecked = chkBox.Checked
                 });
 
@@ -199,6 +203,9 @@ namespace Web
             info = "App starting...";
             try
             {
+                btnSend.Enabled = false;
+                btnSearch.Enabled = false;
+
                 Thread workerThread = new Thread(new ThreadStart(MainTask));
                 workerThread.Start();
             }
@@ -206,6 +213,11 @@ namespace Web
             {
                 LabelDanger.Text = ex.Message;
                 info = ex.Message;
+            }
+            finally
+            {
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void btnRefresh_Click(object sender, EventArgs e)
@@ -303,6 +315,7 @@ namespace Web
                         string statementdateStr = LStatementSelectedRow[i].StatementDate.ToString("yyyy-MM-dd");
                         string CardCode = LStatementSelectedRow[i].CardCode;
                         string CardName = LStatementSelectedRow[i].CardName;
+                        string senddatestr = LStatementSelectedRow[i].SendDate.ToString("yyyy-MM-dd hh:mm:ss tt");
 
                         string path = folderDir + "\\" + ID + "\\";
                         if (!Directory.Exists(path))
@@ -343,6 +356,12 @@ namespace Web
                             if (param.Name.Equals("IncludeNoBal"))
                             {
                                 crystalReport.SetParameterValue("IncludeNoBal", true);
+                                continue;
+                            }
+
+                            if (param.Name.Equals("PrintDate"))
+                            {
+                                crystalReport.SetParameterValue("PrintDate", senddatestr);
                                 continue;
                             }
                         }
@@ -402,10 +421,14 @@ namespace Web
 
                     string subject = lstatementSelectedObj.EmailSubject;
                     subject = subject.Replace(@"[CardName]", CardName);
+                    subject = subject.Replace(@"[DD]", statementdate.ToString("dd"));
+                    subject = subject.Replace(@"[MM]", statementdate.ToString("MM"));
                     subject = subject.Replace(@"[MMM]", statementdate.ToString("MMM"));
                     subject = subject.Replace(@"[YYYY]", statementdate.ToString("yyyy"));
 
                     string content = lstatementSelectedObj.EmailContent;
+                    content = content.Replace(@"[DD]", statementdate.ToString("dd"));
+                    content = content.Replace(@"[MM]", statementdate.ToString("MM"));
                     content = content.Replace(@"[MMM]", statementdate.ToString("MMM"));
                     content = content.Replace(@"[YYYY]", statementdate.ToString("yyyy"));
 
@@ -446,6 +469,29 @@ namespace Web
                             }
                         }
 
+                        if (oMail.Attachments.Count <= 0)
+                        {
+                            using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
+                            {
+                                string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
+                                "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
+                                "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
+                                statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
+                                Session["UserId"].ToString() + "', 'Failed', '" + "No attachment." + "');";
+
+                                SqlCommand command = new SqlCommand(query, connection);
+                                command.Connection.Open();
+                                command.ExecuteNonQuery();
+                                command.Connection.Close();
+
+                            }
+                            info = "Send E-Mail Error:" + "No attachment.";
+                            LabelDanger.Text = info;
+                            ft_logs.WriteLine(Environment.NewLine + info, "Error");
+
+                            continue;
+                        }
+
                         SmtpClient oSTMP = new SmtpClient();
                         oSTMP.Host = smtp;
                         oSTMP.Port = int.Parse(port);
@@ -461,7 +507,7 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
                             statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
                             Session["UserId"].ToString() + "', 'Success', '');";
 
@@ -477,7 +523,7 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
                             statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
                             Session["UserId"].ToString() + "', 'Failed', '" + ex.Message + "');";
 
@@ -494,6 +540,7 @@ namespace Web
                     }
                 }
             }
+            inProcess = false;
             ft_logs.WriteLine("✉ Send E-Mail ended!", "Info");
         }
         protected void chkAll_CheckedChanged(object sender, EventArgs e)
@@ -528,6 +575,7 @@ namespace Web
             Label emailsubject = (Label)GridView1.Rows[selRowIndex].FindControl("lblEmailSubject");
             Label emailcontent = (Label)GridView1.Rows[selRowIndex].FindControl("lblEmailContent");
             Label statementdate = (Label)GridView1.Rows[selRowIndex].FindControl("lblStatementDate");
+            Label senddate = (Label)GridView1.Rows[selRowIndex].FindControl("lblSendDate");
 
             if (chk.Checked)
             {
@@ -541,6 +589,7 @@ namespace Web
                     EmailSubject = emailsubject.Text,
                     EmailContent = emailcontent.Text,
                     StatementDate = DateTime.ParseExact(statementdate.Text, "dd/MM/yyyy", null),
+                    SendDate = DateTime.ParseExact(senddate.Text, "dd/MM/yyyy hh:mm tt", null),
                     isChecked = chk.Checked
                 });
             }
@@ -577,6 +626,7 @@ namespace Web
                 Label LabelEmailSubject = (Label)row.FindControl("lblEmailSubject");
                 Label LabelEmailContent = (Label)row.FindControl("lblEmailContent");
                 Label LabelStatementDate = (Label)row.FindControl("lblStatementDate");
+                Label LabelSendDate = (Label)row.FindControl("lblSendDate");
                 CheckBox chkBox = (CheckBox)row.FindControl("chkBox");
 
                 LStatementSelectedRowAll.Add(new LStatementSelectedRow
@@ -589,6 +639,7 @@ namespace Web
                     EmailSubject = LabelEmailSubject.Text,
                     EmailContent = LabelEmailContent.Text,
                     StatementDate = DateTime.ParseExact(LabelStatementDate.Text, "dd/MM/yyyy", null),
+                    SendDate = DateTime.ParseExact(LabelSendDate.Text, "dd/MM/yyyy hh:mm tt", null),
                     isChecked = true
                 });
             }
@@ -667,10 +718,15 @@ namespace Web
             if (e.Row.RowType == DataControlRowType.Pager)
             {
                 DropDownList DDL = new DropDownList();
-                DDL.Items.Add("5");
                 DDL.Items.Add("10");
-                DDL.Items.Add("15");
                 DDL.Items.Add("20");
+                DDL.Items.Add("30");
+                DDL.Items.Add("40");
+                DDL.Items.Add("50");
+                DDL.Items.Add("60");
+                DDL.Items.Add("70");
+                DDL.Items.Add("80");
+                DDL.Items.Add("90");
                 DDL.Items.Add("100");
                 DDL.AutoPostBack = true;
                 DDL.SelectedValue = GridView1.PageSize.ToString();

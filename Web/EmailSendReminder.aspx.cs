@@ -47,6 +47,7 @@ namespace Web
         protected static string letterType = "R1";
         protected static string strFr = "";
         protected static string strTo = "";
+        protected static string strLastSent = "";
         protected static string query = "";
 
         protected void Page_Load(object sender, EventArgs e)
@@ -55,6 +56,7 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
             else
             {
@@ -64,7 +66,6 @@ namespace Web
 
             if (!Page.IsPostBack)
             {
-
                 lblUser.Text = Session["UserId"].ToString(); ;
 
                 txtReminderDate.Value = DateTime.Now.ToString("yyyy-MM-dd");
@@ -74,6 +75,9 @@ namespace Web
                 dt = null;
                 GridView1.DataSource = null;
                 GridView1.DataBind();
+
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
 
@@ -109,6 +113,7 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
 
             warning = "";
@@ -129,6 +134,7 @@ namespace Web
                 letterType = cbxLetterType.SelectedValue.ToString();
                 strFr = txtCardCodeFr.Value.Equals("") ? "*" : txtCardCodeFr.Value.ToString();
                 strTo = txtCardCodeTo.Value.Equals("") ? "*" : txtCardCodeTo.Value.ToString();
+                strLastSent = ddlLastSent.SelectedValue.Equals("") ? "A" : ddlLastSent.SelectedValue;
 
                 SqlDataSource.SelectParameters.Add("reminderdateStr", reminderdateStr);
                 SqlDataSource.SelectParameters.Add("exceedDaysFr", exceedDaysFr.ToString());
@@ -137,6 +143,7 @@ namespace Web
                 SqlDataSource.SelectParameters.Add("letterType", letterType);
                 SqlDataSource.SelectParameters.Add("strFr", strFr);
                 SqlDataSource.SelectParameters.Add("strTo", strTo);
+                SqlDataSource.SelectParameters.Add("strLastSent", strLastSent);
 
                 LabelRmdDate.Text = "As at " + txtReminderDate.Value.ToString();
 
@@ -149,7 +156,7 @@ namespace Web
                         query = "SELECT * FROM [FTS_fn_GetBPList_Reminder] ('" + reminderdateStr + "', '" +
                             exceedDaysFr + "', '" + exceedDaysTo + "', '" +
                             minAmount + "', '" + letterType + "', '" +
-                            strFr + "', '" + strTo + "') T0 ORDER BY T0.CardCode ";
+                            strFr + "', '" + strTo + "', '" + strLastSent + "') T0 ORDER BY T0.CardCode ";
 
                         dat.SelectCommand.CommandText = query;
                         SqlDataSource.SelectCommand = query;
@@ -188,6 +195,7 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
 
             init();
@@ -198,11 +206,13 @@ namespace Web
             }
 
             Timer1.Enabled = true;
-            btnSend.Enabled = false;
             imgLoading.Visible = true;
             info = "App starting...";
             try
             {
+                btnSend.Enabled = false;
+                btnSearch.Enabled = false;
+
                 Thread workerThread = new Thread(new ThreadStart(MainTask));
                 workerThread.Start();
             }
@@ -210,6 +220,11 @@ namespace Web
             {
                 LabelDanger.Text = ex.Message;
                 info = ex.Message;
+            }
+            finally
+            {
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void Timer1_Tick(object sender, EventArgs e)
@@ -264,6 +279,7 @@ namespace Web
             ft_logs.WriteLine("Generate reminder begin...", "Info");
             DateTime reminderdate = DateTime.Parse(txtReminderDate.Value.ToString());
             string reminderdateStr = reminderdate.ToString("yyyyMMdd");
+            string senddateStr = DateTime.Now.ToString("yyyy-MM-dd");
             string layoutName = LabelCompany.Text + "_Reminder";
 
 
@@ -362,6 +378,12 @@ namespace Web
                                 crystalReport.SetParameterValue("CardCode@FROM OCRD WHERE CardType = 'C'", CardCode);
                                 continue;
                             }
+
+                            if (param.Name.Equals("PrintDate"))
+                            {
+                                crystalReport.SetParameterValue("PrintDate", senddateStr);
+                                continue;
+                            }
                         }
 
                         string ExportPath = path + "RMD_" + CardCode + "_" + reminderdate.ToString("yyyyMMdd") + ".pdf";
@@ -447,10 +469,14 @@ namespace Web
 
                     string subject = envelope.EmailSubject;
                     subject = subject.Replace(@"[CardName]", CardName);
+                    subject = subject.Replace(@"[DD]", reminderdate.ToString("dd"));
+                    subject = subject.Replace(@"[MM]", reminderdate.ToString("MM"));
                     subject = subject.Replace(@"[MMM]", reminderdate.ToString("MMM"));
                     subject = subject.Replace(@"[YYYY]", reminderdate.ToString("yyyy"));
 
                     string content = envelope.EmailContent;
+                    content = content.Replace(@"[DD]", reminderdate.ToString("dd"));
+                    content = content.Replace(@"[MM]", reminderdate.ToString("MM"));
                     content = content.Replace(@"[MMM]", reminderdate.ToString("MMM"));
                     content = content.Replace(@"[YYYY]", reminderdate.ToString("yyyy"));
 
@@ -491,6 +517,29 @@ namespace Web
                             }
                         }
 
+                        if (oMail.Attachments.Count <= 0)
+                        {
+                            using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
+                            {
+                                string query = "INSERT INTO ft_email_logs_reminder (CardCode, CardName, EmailTo, EmailCC, " +
+                                "EmailSubject, EmailContent, ReminderDate, MinAmt, InvDaysFrom, InvDaysTo, LetterType, SendDate, SendBy, SendResult, ErrorDesc) " +
+                                "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
+                                reminderdate.ToString("yyyy-MM-dd") + "', '" + minAmount + "', '" + exceedDaysFr + "', '" + exceedDaysTo + "', '" + letterType + "', '" +
+                                DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
+                                Session["UserId"].ToString() + "', 'Failed', '" + "No attachment." + "');";
+
+                                SqlCommand command = new SqlCommand(query, connection);
+                                command.Connection.Open();
+                                command.ExecuteNonQuery();
+                                command.Connection.Close();
+                            }
+                            info = "Send E-Mail Error:" + "No attachment.";
+                            LabelDanger.Text = info;
+                            ft_logs.WriteLine(Environment.NewLine + info, "Error");
+
+                            continue;
+                        }
+
                         SmtpClient oSTMP = new SmtpClient();
                         oSTMP.Host = smtp;
                         oSTMP.Port = int.Parse(port);
@@ -506,7 +555,7 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_reminder (CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, ReminderDate, MinAmt, InvDaysFrom, InvDaysTo, LetterType, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
                             reminderdate.ToString("yyyy-MM-dd") + "', '" + minAmount + "', '"+ exceedDaysFr + "', '"+ exceedDaysTo + "', '" + letterType +"', '" +
                             DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
                             Session["UserId"].ToString() + "', 'Success', '');";
@@ -523,7 +572,7 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_reminder (CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, ReminderDate, MinAmt, InvDaysFrom, InvDaysTo, LetterType, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
                             reminderdate.ToString("yyyy-MM-dd") + "', '" + minAmount + "', '" + exceedDaysFr + "', '" + exceedDaysTo + "', '" + letterType + "', '" +
                             DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
                             Session["UserId"].ToString() + "', 'Failed', '" + ex.Message + "');";
@@ -540,6 +589,7 @@ namespace Web
                     }
                 }
             }
+            inProcess = false;
             ft_logs.WriteLine("✉ Send E-Mail ended!", "Info");
         }
 
@@ -689,6 +739,7 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
 
             CheckBox chk = (CheckBox)sender;
@@ -824,10 +875,15 @@ namespace Web
             if (e.Row.RowType == DataControlRowType.Pager)
             {
                 DropDownList DDL = new DropDownList();
-                DDL.Items.Add("5");
                 DDL.Items.Add("10");
-                DDL.Items.Add("15");
                 DDL.Items.Add("20");
+                DDL.Items.Add("30");
+                DDL.Items.Add("40");
+                DDL.Items.Add("50");
+                DDL.Items.Add("60");
+                DDL.Items.Add("70");
+                DDL.Items.Add("80");
+                DDL.Items.Add("90");
                 DDL.Items.Add("100");
                 DDL.AutoPostBack = true;
                 DDL.SelectedValue = GridView1.PageSize.ToString();

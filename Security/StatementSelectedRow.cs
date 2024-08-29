@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace Security
 {
+    [Serializable()]
     public class StatementSelectedRow
     {
         public string CardCode { get; set; }

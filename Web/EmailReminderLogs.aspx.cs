@@ -60,8 +60,7 @@ namespace Web
             }
 
             if (!Page.IsPostBack)
-            {
-
+            { 
                 lblUser.Text = Session["UserId"].ToString();
 
                 txtSendDateFr.Text = DateTime.Now.ToString("dd/MM/yyyy");
@@ -72,6 +71,9 @@ namespace Web
                 dt = null;
                 GridView1.DataSource = null;
                 GridView1.DataBind();
+
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void btnSelect_Click(object sender, EventArgs e)
@@ -219,11 +221,13 @@ namespace Web
             }
 
             Timer1.Enabled = true;
-            btnSend.Enabled = false;
             imgLoading.Visible = true;
             info = "App starting...";
             try
             {
+                btnSend.Enabled = false;
+                btnSearch.Enabled = false;
+
                 Thread workerThread = new Thread(new ThreadStart(MainTask));
                 workerThread.Start();
             }
@@ -231,6 +235,11 @@ namespace Web
             {
                 LabelDanger.Text = ex.Message;
                 info = ex.Message;
+            }
+            finally
+            {
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void MainTask()
@@ -317,6 +326,7 @@ namespace Web
                         int InvDaysFrom = LReminderSelectedRow[i].InvDaysFrom;
                         int InvDaysTo = LReminderSelectedRow[i].InvDaysTo;
                         string LetterType = LReminderSelectedRow[i].LetterType;
+                        string senddatestr = LReminderSelectedRow[i].SendDate.ToString("yyyy-MM-dd");
 
                         string path = folderDir + "\\" + ID + "\\";
                         if (!Directory.Exists(path))
@@ -375,6 +385,12 @@ namespace Web
                             if (param.Name.Equals("CardCode@FROM OCRD WHERE CardType = 'C'"))
                             {
                                 crystalReport.SetParameterValue("CardCode@FROM OCRD WHERE CardType = 'C'", CardCode);
+                                continue;
+                            }
+
+                            if (param.Name.Equals("PrintDate"))
+                            {
+                                crystalReport.SetParameterValue("PrintDate", senddatestr);
                                 continue;
                             }
                         }
@@ -437,10 +453,14 @@ namespace Web
 
                     string subject = lreminderSelectedObj.EmailSubject;
                     subject = subject.Replace(@"[CardName]", CardName);
+                    subject = subject.Replace(@"[DD]", reminderdate.ToString("dd"));
+                    subject = subject.Replace(@"[MM]", reminderdate.ToString("MM"));
                     subject = subject.Replace(@"[MMM]", reminderdate.ToString("MMM"));
                     subject = subject.Replace(@"[YYYY]", reminderdate.ToString("yyyy"));
 
                     string content = lreminderSelectedObj.EmailContent;
+                    content = content.Replace(@"[DD]", reminderdate.ToString("dd"));
+                    content = content.Replace(@"[MM]", reminderdate.ToString("MM"));
                     content = content.Replace(@"[MMM]", reminderdate.ToString("MMM"));
                     content = content.Replace(@"[YYYY]", reminderdate.ToString("yyyy"));
 
@@ -481,6 +501,30 @@ namespace Web
                             }
                         }
 
+                        if (oMail.Attachments.Count <= 0)
+                        {
+                            using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
+                            {
+                                string query = "INSERT INTO ft_email_logs_reminder (CardCode, CardName, EmailTo, EmailCC, " +
+                                "EmailSubject, EmailContent, ReminderDate, MinAmt, InvDaysFrom, InvDaysTo, LetterType, SendDate, SendBy, SendResult, ErrorDesc) " +
+                                "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
+                                reminderdate.ToString("yyyy-MM-dd") + "', '" + minamt + "', '" + invdaysfrom + "', '" + invdaysto + "', '" + lettertype + "', '" +
+                                DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
+                                Session["UserId"].ToString() + "', 'Failed', '" + "No attachment." + "');";
+
+                                SqlCommand command = new SqlCommand(query, connection);
+                                command.Connection.Open();
+                                command.ExecuteNonQuery();
+                                command.Connection.Close();
+
+                            }
+                            info = "Send E-Mail Error:" + "No attachment.";
+                            LabelDanger.Text = info;
+                            ft_logs.WriteLine(Environment.NewLine + info, "Error");
+
+                            continue;
+                        }
+
                         SmtpClient oSTMP = new SmtpClient();
                         oSTMP.Host = smtp;
                         oSTMP.Port = int.Parse(port);
@@ -496,7 +540,7 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_reminder (CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, ReminderDate, MinAmt, InvDaysFrom, InvDaysTo, LetterType, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
                             reminderdate.ToString("yyyy-MM-dd") + "', '" + minamt + "', '" + invdaysfrom + "', '" + invdaysto + "', '" + lettertype + "', '" +
                             DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
                             Session["UserId"].ToString() + "', 'Success', '');";
@@ -513,7 +557,7 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_reminder (CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, ReminderDate, MinAmt, InvDaysFrom, InvDaysTo, LetterType, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            "VALUES ('" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" + subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" +
                             reminderdate.ToString("yyyy-MM-dd") + "', '" + minamt + "', '" + invdaysfrom + "', '" + invdaysto + "', '" + lettertype + "', '" +
                             DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
                             Session["UserId"].ToString() + "', 'Failed', '" + ex.Message + "');";
@@ -531,6 +575,7 @@ namespace Web
                     }
                 }
             }
+            inProcess = false;
             ft_logs.WriteLine("✉ Send E-Mail ended!", "Info");
         }
         protected void chkAll_CheckedChanged(object sender, EventArgs e)
@@ -724,10 +769,15 @@ namespace Web
             if (e.Row.RowType == DataControlRowType.Pager)
             {
                 DropDownList DDL = new DropDownList();
-                DDL.Items.Add("5");
                 DDL.Items.Add("10");
-                DDL.Items.Add("15");
                 DDL.Items.Add("20");
+                DDL.Items.Add("30");
+                DDL.Items.Add("40");
+                DDL.Items.Add("50");
+                DDL.Items.Add("60");
+                DDL.Items.Add("70");
+                DDL.Items.Add("80");
+                DDL.Items.Add("90");
                 DDL.Items.Add("100");
                 DDL.AutoPostBack = true;
                 DDL.SelectedValue = GridView1.PageSize.ToString();

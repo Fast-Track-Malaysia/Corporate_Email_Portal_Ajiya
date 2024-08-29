@@ -12,6 +12,7 @@ namespace Security
         public string SAPDocNo { get; set; }
         public int PortalOid { get; set; }
         public string PortalDocNo { get; set; }
+        public DateTime PostingDate { get; set; }
         public DateTime DocDate { get; set; }
         public string CardCode { get; set; }
         public string CardName { get; set; }

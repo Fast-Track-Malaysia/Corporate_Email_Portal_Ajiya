@@ -13,6 +13,18 @@
             height: 5%;
             z-index: 1001;
         }
+
+        .fixedWitdhS {
+            overflow-wrap: break-word;
+            text-align: left;
+        }
+
+        .fixedWitdhL {
+            column-width: 150px;
+            max-width: 150px;
+            overflow-wrap: break-word;
+            text-align: left;
+        }
     </style>
 
     <h1 class="font_bold wrap">Invoice Sent Logs</h1>
@@ -21,7 +33,7 @@
     </h3>
 
     <asp:SqlDataSource CancelSelectOnNullParameter="true" ID="SqlDataSource" runat="server"
-        SelectCommand="SELECT * FROM [FTS_fn_InvoiceLogs] (@senddatefrStr, @senddatetoStr, @datefrStr, @datetoStr, @strFr, @strTo, @sendResult) T0 ORDER BY T0.SendDate DESC, T0.DocEntry "
+        SelectCommand="SELECT * FROM [FTS_fn_InvoiceLogs] (@senddatefrStr, @senddatetoStr, @datefrStr, @datetoStr, @strFr, @strTo, @sendResult) T0 ORDER BY T0.SendDate DESC, T0.PortalDocNum "
         OnSelected="SqlDataSource_Selected"
         FilterExpression="CardCode LIKE '%{0}%' OR CardName LIKE '%{0}%' OR EmailTo LIKE '%{0}%' OR EmailCC LIKE '%{0}%' OR CONVERT(DocNum,'System.String') = '{0}' 
         OR PortalDocNum = '{0}' ">
@@ -157,41 +169,41 @@
                                     CommandName="chkboxCheck" />
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="ID" SortExpression="ID" ItemStyle-Width="150px" Visible="false">
+                        <asp:TemplateField HeaderText="ID" SortExpression="ID" Visible="false" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblID" runat="server" Text='<%# Bind("ID") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Doc Entry" SortExpression="DocEntry" ItemStyle-Width="150px" Visible="false">
+                        <asp:TemplateField HeaderText="Doc Entry" SortExpression="DocEntry" Visible="false" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblDocEntry" runat="server" Text='<%# Bind("DocEntry") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="SAP Doc No." SortExpression="DocNum" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="SAP Doc No." SortExpression="DocNum" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblDocNum" runat="server" Text='<%# Bind("DocNum") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Portal Oid" SortExpression="PortalOid" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Portal Oid" SortExpression="PortalOid" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblPortalOid" runat="server" Text='<%# Bind("PortalOid") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Portal Doc No." SortExpression="PortalDocNum" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Portal Doc No." SortExpression="PortalDocNum" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblPortalDocNum" runat="server" Text='<%# Bind("PortalDocNum") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="CardCode" SortExpression="CardCode">
+                        <asp:TemplateField HeaderText="CardCode" SortExpression="CardCode" ItemStyle-CssClass="fixedWitdhS">
                             <EditItemTemplate>
-                                <asp:TextBox ID="TextBox1" runat="server" Text='<%# Bind("CardCode") %>' ItemStyle-Width="20px"></asp:TextBox>
+                                <asp:TextBox ID="TextBox1" runat="server" Text='<%# Bind("CardCode") %>'></asp:TextBox>
                             </EditItemTemplate>
                             <ItemTemplate>
                                 <asp:Label ID="LabelCardCode" runat="server" Text='<%# Bind("CardCode") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="CardName" SortExpression="CardName" ItemStyle-Width="400px">
+                        <asp:TemplateField HeaderText="CardName" SortExpression="CardName" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="CardName" runat="server" Text='<%# Bind("CardName") %>'></asp:Label>
                                 <asp:Label ID="Label1" runat="server" Text="" class="label label-danger wrap font_light"></asp:Label>
@@ -200,60 +212,60 @@
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Email To" SortExpression="EmailTo" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Email To" SortExpression="EmailTo" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailTo" runat="server" Text='<%# Bind("EmailTo") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="CC" SortExpression="EmailCC" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="CC" SortExpression="EmailCC" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailCC" runat="server" Text='<%# Bind("EmailCC") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Subject" SortExpression="EmailSubject" ItemStyle-Width="150px" Visible="false">
+                        <asp:TemplateField HeaderText="Subject" SortExpression="EmailSubject" ItemStyle-CssClass="fixedWitdhS" Visible="false">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailSubject" runat="server" Text='<%# Bind("EmailSubject") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Content" SortExpression="EmailContent" ItemStyle-Width="150px" Visible="false">
+                        <asp:TemplateField HeaderText="Content" SortExpression="EmailContent" ItemStyle-CssClass="fixedWitdhS" Visible="false">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailContent" runat="server" Text='<%# Bind("EmailContent") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Invoice Date" SortExpression="InvoiceDate" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Invoice Date" SortExpression="InvoiceDate" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblInvoiceDate" runat="server" Text='<%# Bind("InvoiceDate") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Send Date" SortExpression="SendDate" ItemStyle-Width="210px">
+                        <asp:TemplateField HeaderText="Send Date" SortExpression="SendDate" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblSendDate" runat="server" Text='<%# Bind("SendDate") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Send By" SortExpression="SendBy" ItemStyle-Width="100px">
+                        <asp:TemplateField HeaderText="Send By" SortExpression="SendBy" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblSendBy" runat="server" Text='<%# Bind("SendBy") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Result" SortExpression="SendResult" ItemStyle-Width="100px">
+                        <asp:TemplateField HeaderText="Result" SortExpression="SendResult" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblSendResult" runat="server" Text='<%# Bind("SendResult") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="Error" SortExpression="ErrorDesc" ItemStyle-Width="400px">
+                        <asp:TemplateField HeaderText="Error" SortExpression="ErrorDesc" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblErrorDesc" runat="server" Text='<%# Bind("ErrorDesc") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="View" HeaderStyle-CssClass="text-center">
+                        <asp:TemplateField HeaderText="View" HeaderStyle-CssClass="text-center" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:HyperLink ID="LinkView" runat="server" CssClass="btn btn-primary btn-xs"
                                     Target="_blank"
-                                    NavigateUrl='<%# string.Format("~/PreviewInvoice.aspx?DocEntry={0}&PortalDocNo={1}&CardCode={2}&Mode=View", HttpUtility.UrlEncode(Eval("PortalOid").ToString()), HttpUtility.UrlEncode(Eval("PortalDocNum").ToString()), HttpUtility.UrlEncode(Eval("CardCode").ToString())) %>'
+                                    NavigateUrl='<%# string.Format("~/PreviewInvoice.aspx?DocEntry={0}&SAPDocNo={1}&PortalDocNo={2}&CardCode={3}&Mode=View", HttpUtility.UrlEncode(Eval("DocEntry").ToString()), HttpUtility.UrlEncode(Eval("DocNum").ToString()), HttpUtility.UrlEncode(Eval("PortalDocNum").ToString()), HttpUtility.UrlEncode(Eval("CardCode").ToString())) %>'
                                     Text="Preview" />
                                 <asp:HyperLink ID="LinkDownload" runat="server" CssClass="btn btn-primary btn-xs"
-                                    NavigateUrl='<%# string.Format("~/PreviewInvoice.aspx?DocEntry={0}&PortalDocNo={1}&CardCode={2}&Mode=Download", HttpUtility.UrlEncode(Eval("PortalOid").ToString()), HttpUtility.UrlEncode(Eval("PortalDocNum").ToString()), HttpUtility.UrlEncode(Eval("CardCode").ToString())) %>'
+                                    NavigateUrl='<%# string.Format("~/PreviewInvoice.aspx?DocEntry={0}&SAPDocNo={1}&PortalDocNo={2}&CardCode={3}&Mode=Download", HttpUtility.UrlEncode(Eval("DocEntry").ToString()), HttpUtility.UrlEncode(Eval("DocNum").ToString()), HttpUtility.UrlEncode(Eval("PortalDocNum").ToString()), HttpUtility.UrlEncode(Eval("CardCode").ToString())) %>'
                                     Text="Download" />
                             </ItemTemplate>
                             <HeaderStyle CssClass="text-center"></HeaderStyle>

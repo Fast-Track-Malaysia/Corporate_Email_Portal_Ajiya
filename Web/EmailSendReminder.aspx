@@ -13,6 +13,18 @@
             height: 5%;
             z-index: 1001;
         }
+
+        .fixedWitdhS {
+            overflow-wrap: break-word;
+            text-align: left;
+        }
+
+        .fixedWitdhL {
+            column-width: 150px;
+            max-width: 150px;
+            overflow-wrap: break-word;
+            text-align: left;
+        }
     </style>
 
     <h1 class="font_bold wrap">E-Mail Reminder</h1>
@@ -21,7 +33,7 @@
         <asp:Label ID="LabelRmdDate" runat="server" Text=""></asp:Label></h3>
 
     <asp:SqlDataSource CancelSelectOnNullParameter="true" ID="SqlDataSource" runat="server"
-        SelectCommand="SELECT * FROM [FTS_fn_GetBPList_Reminder] (@reminderdateStr, @exceedDaysFr, @exceedDaysTo, @minAmount, @letterType, @strFr, @strTo) T0 ORDER BY T0.CardCode "
+        SelectCommand="SELECT * FROM [FTS_fn_GetBPList_Reminder] (@reminderdateStr, @exceedDaysFr, @exceedDaysTo, @minAmount, @letterType, @strFr, @strTo, @strLastSent) T0 ORDER BY T0.CardCode "
         OnSelected="SqlDataSource_Selected"
         FilterExpression="CardCode LIKE '%{0}%' OR CardName LIKE '%{0}%' OR EmailTo LIKE '%{0}%' OR EmailCC LIKE '%{0}%' ">
         <FilterParameters>
@@ -35,6 +47,7 @@
             <asp:Parameter Name="letterType" Type="String" />
             <asp:Parameter Name="strFr" Type="String" />
             <asp:Parameter Name="strTo" Type="String" />
+            <asp:Parameter Name="strLastSent" Type="String" />
         </SelectParameters>
     </asp:SqlDataSource>
 
@@ -108,6 +121,16 @@
                             <asp:TextBox ID="txtSearch" runat="server" class="form-control input-sm" placeholder="Press Enter to Search" alt="General Search"></asp:TextBox>
                         </div>
                     </div>
+                    <div class="col-md-2">
+                        <div class="has-feedback">
+                            <asp:Label runat="server">&nbsp;</asp:Label>
+                            <asp:DropDownList ID="ddlLastSent" runat="server" CssClass="form-control input-sm" Visible="true">
+                                <asp:ListItem Value="A">All Sent/Not Sent</asp:ListItem>
+                                <asp:ListItem Value="Y">Sent</asp:ListItem>
+                                <asp:ListItem Value="N">Not Sent</asp:ListItem>
+                            </asp:DropDownList>
+                        </div>
+                    </div>
                 </div>
             </div>
             <hr class="wrap" />
@@ -144,16 +167,16 @@
                                     CommandName="chkboxCheck" />
                             </ItemTemplate>
                         </asp:TemplateField>
-                        <asp:TemplateField HeaderText="CardCode" SortExpression="CardCode">
+                        <asp:TemplateField HeaderText="CardCode" SortExpression="CardCode" ItemStyle-CssClass="fixedWitdhS">
                             <EditItemTemplate>
-                                <asp:TextBox ID="TextBox1" runat="server" Text='<%# Bind("CardCode") %>' ItemStyle-Width="20px"></asp:TextBox>
+                                <asp:TextBox ID="TextBox1" runat="server" Text='<%# Bind("CardCode") %>'></asp:TextBox>
                             </EditItemTemplate>
                             <ItemTemplate>
                                 <asp:Label ID="LabelCardCode" runat="server" Text='<%# Bind("CardCode") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="CardName" SortExpression="CardName" ItemStyle-Width="400px">
+                        <asp:TemplateField HeaderText="CardName" SortExpression="CardName" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="CardName" runat="server" Text='<%# Bind("CardName") %>'></asp:Label>
                                 <asp:Label ID="LabelDanger" runat="server" Text="" class="label label-danger wrap font_light"></asp:Label>
@@ -162,19 +185,19 @@
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Email To" SortExpression="EmailTo" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Email To" SortExpression="EmailTo" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailTo" runat="server" Text='<%# Bind("EmailTo") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="CC" SortExpression="EmailCC" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="CC" SortExpression="EmailCC" ItemStyle-CssClass="fixedWitdhL">
                             <ItemTemplate>
                                 <asp:Label ID="lblEmailCC" runat="server" Text='<%# Bind("EmailCC") %>'></asp:Label>
                             </ItemTemplate>
                         </asp:TemplateField>
 
-                        <asp:TemplateField HeaderText="Last Sent" SortExpression="LastSent" ItemStyle-Width="150px">
+                        <asp:TemplateField HeaderText="Last Sent" SortExpression="LastSent" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:Label ID="lblLastSent" runat="server" Text='<%# Bind("LastSent") %>'></asp:Label>
                             </ItemTemplate>
@@ -190,16 +213,18 @@
                             <ItemStyle HorizontalAlign="Right" />
                         </asp:BoundField>
 
-                        <asp:TemplateField HeaderText="View" HeaderStyle-CssClass="text-center">
+                        <asp:TemplateField HeaderText="View" HeaderStyle-CssClass="text-center" ItemStyle-CssClass="fixedWitdhS">
                             <ItemTemplate>
                                 <asp:HyperLink ID="LinkView" runat="server" CssClass="btn btn-primary btn-xs"
                                     Target="_blank"
-                                    NavigateUrl='<%# string.Format("~/PreviewReminder.aspx?CardCode={0}&RmdDate={1}&MinAmount={2}&ExceedDaysFr={3}&ExceedDaysTo={4}&LetterType={5}" +
-    "&Mode=View", HttpUtility.UrlEncode(Eval("CardCode").ToString()), txtReminderDate.Value, txtMinAmount.Value.ToString(), txtExceedDaysFr.Value.ToString(), txtExceedDaysTo.Value.ToString(), cbxLetterType.SelectedValue.ToString()) %>'
+                                    NavigateUrl='<%# string.Format("~/PreviewReminder.aspx?CardCode={0}&RmdDate={1}&MinAmount={2}&ExceedDaysFr={3}&ExceedDaysTo={4}&LetterType={5}&SendDate={6}" +
+    "&Mode=View", HttpUtility.UrlEncode(Eval("CardCode").ToString()), DateTime.Parse(txtReminderDate.Value).ToString("dd/MM/yyyy"), txtMinAmount.Value.ToString(), txtExceedDaysFr.Value.ToString(), txtExceedDaysTo.Value.ToString(), cbxLetterType.SelectedValue.ToString(), 
+    DateTime.Today.ToString("dd/MM/yyyy hh:mm tt")) %>'
                                     Text="Preview" />
                                 <asp:HyperLink ID="LinkDownload" runat="server" CssClass="btn btn-primary btn-xs"
-                                    NavigateUrl='<%# string.Format("~/PreviewReminder.aspx?CardCode={0}&RmdDate={1}&MinAmount={2}&ExceedDaysFr={3}&ExceedDaysTo={4}&LetterType={5}" +
-    "&Mode=Download", HttpUtility.UrlEncode(Eval("CardCode").ToString()), txtReminderDate.Value, txtMinAmount.Value.ToString(), txtExceedDaysFr.Value.ToString(), txtExceedDaysTo.Value.ToString(), cbxLetterType.SelectedValue.ToString()) %>'
+                                    NavigateUrl='<%# string.Format("~/PreviewReminder.aspx?CardCode={0}&RmdDate={1}&MinAmount={2}&ExceedDaysFr={3}&ExceedDaysTo={4}&LetterType={5}&SendDate={6}" +
+    "&Mode=Download", HttpUtility.UrlEncode(Eval("CardCode").ToString()), DateTime.Parse(txtReminderDate.Value).ToString("dd/MM/yyyy"), txtMinAmount.Value.ToString(), txtExceedDaysFr.Value.ToString(), txtExceedDaysTo.Value.ToString(), cbxLetterType.SelectedValue.ToString(), 
+    DateTime.Today.ToString("dd/MM/yyyy hh:mm tt")) %>'
                                     Text="Download" />
                             </ItemTemplate>
                             <HeaderStyle CssClass="text-center"></HeaderStyle>

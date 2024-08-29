@@ -147,6 +147,9 @@ namespace Web
                     }
                 }
             }
+
+            base.OnLoad(e);
+            Page.Header.DataBind();
         }
         protected void btnProfile_Click(object sender, EventArgs e)
         {

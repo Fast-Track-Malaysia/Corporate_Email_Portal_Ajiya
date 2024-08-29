@@ -1,10 +1,11 @@
-﻿using ClosedXML.Excel;
+using ClosedXML.Excel;
 using CrystalDecisions.CrystalReports.Engine;
 using CrystalDecisions.Shared;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
 using Security;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -20,10 +21,12 @@ using System.Web.Configuration;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 
+
 namespace Web
 {
-    public partial class EmailSendReceipt : System.Web.UI.Page
+    public partial class EmailSend : System.Web.UI.Page
     {
+
         protected static Dictionary<string, List<FileInfo>> UserFiles = new Dictionary<string, List<FileInfo>>();
         protected static Dictionary<string, List<FileInfo>> Documents = new Dictionary<string, List<FileInfo>>();
         protected static DataTable dt;
@@ -31,21 +34,19 @@ namespace Web
         protected static List<string> SelectedCardCodeAll = new List<string>();
         protected static List<string> noRecordCardCode = new List<string>();
         protected static List<string> docPath = new List<string>();
-        protected static List<ReceiptSelectedRow> ReceiptSelectedRow = new List<ReceiptSelectedRow>();
-        protected static List<ReceiptSelectedRow> ReceiptSelectedRowAll = new List<ReceiptSelectedRow>();
+        protected List<StatementSelectedRow> StatementSelectedRow = new List<StatementSelectedRow>();
+        protected List<StatementSelectedRow> StatementSelectedRowAll = new List<StatementSelectedRow>();
         protected int totalRecords = 0;
-        protected String pagerInfo = "";
+        protected static String pagerInfo = "";
         protected static string folderDir = "";
         protected static string info;
         protected static string warning;
         protected static bool inProcess = false;
-        protected static DateTime DateFrom;
-        protected static DateTime DateTo;
-        protected static string DateFromStr = "";
-        protected static string DateToStr = "";
-        protected static string strFr = "";
-        protected static string strTo = "";
-        protected static string strLastSent = "";
+        protected DateTime statementdate;
+        //protected static string statementdateStr = "";
+        //protected static string strFr = "";
+        //protected static string strTo = "";
+        //protected static string strLastSent = "";
         protected static string query = "";
 
         protected void Page_Load(object sender, EventArgs e)
@@ -62,12 +63,12 @@ namespace Web
                 SqlDataSource.ConnectionString = Session["ConnString"].ToString();
             }
 
-            if (!IsPostBack)
+            if (!Page.IsPostBack)
             {
+
                 lblUser.Text = Session["UserId"].ToString();
 
-                txtDateFrom.Text = DateTime.Now.ToString("dd/MM/yyyy");
-                txtDateTo.Text = DateTime.Now.ToString("dd/MM/yyyy");
+                txtStatementDate.Text = DateTime.Now.ToString("dd/MM/yyyy");
 
                 info = "Page Load";
 
@@ -83,25 +84,18 @@ namespace Web
         protected void btnSelect_Click(object sender, EventArgs e)
         {
             int a = GridView1.PageIndex;
-            ReceiptSelectedRow.Clear();
+            StatementSelectedRow.Clear();
             LabelInfo.Text = "";
             foreach (GridViewRow row in GridView1.Rows)
             {
-                Label lblDocEntry = (Label)row.FindControl("lblDocEntry");
-                Label lblSAPDocNo = (Label)row.FindControl("lblSAPDocNo");
-                Label lblPortalDocNo = (Label)row.FindControl("lblPortalDocNo");
-                Label lblDocDate = (Label)row.FindControl("lblDocDate");
                 Label LabelCardcode = (Label)row.FindControl("LabelCardcode");
                 Label LabelCardName = (Label)row.FindControl("CardName");
                 Label LabelEmailTo = (Label)row.FindControl("lblEmailTo");
                 Label LabelEmailCC = (Label)row.FindControl("lblEmailCC");
                 CheckBox chkBox = (CheckBox)row.FindControl("chkBox");
 
-                ReceiptSelectedRow.Add(new ReceiptSelectedRow
+                StatementSelectedRow.Add(new StatementSelectedRow
                 {
-                    DocEntry = int.Parse(lblDocEntry.Text),
-                    SAPDocNo = lblSAPDocNo.Text,
-                    DocDate = DateTime.ParseExact(lblDocDate.Text, "dd/MM/yyyy", null),
                     CardCode = LabelCardcode.Text,
                     CardName = LabelCardName.Text,
                     EmailTo = LabelEmailTo.Text,
@@ -109,7 +103,7 @@ namespace Web
                     isChecked = chkBox.Checked
                 });
 
-                LabelInfo.Text = "Selected : " + ReceiptSelectedRow.Count();
+                LabelInfo.Text = "Selected : " + StatementSelectedRow.Count();
             }
         }
 
@@ -119,38 +113,40 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
 
-            warning = "";
             info = "Search...";
-            ft_logs.WriteLine("Perform search for Receipt.", "Info");
+            ft_logs.WriteLine("Perform search for statement date " + txtStatementDate.Text, "Info");
             init();
-            ReceiptSelectedRow.Clear();
+            StatementSelectedRow.Clear();
             SqlDataSource.SelectParameters.Clear();
             try
             {
-                DateFrom = DateTime.ParseExact(txtDateFrom.Text, "dd/MM/yyyy", null);
-                DateTo = DateTime.ParseExact(txtDateTo.Text, "dd/MM/yyyy", null);
-                DateFromStr = DateFrom.ToString("yyyyMMdd");
-                DateToStr = DateTo.ToString("yyyyMMdd");
+                string statementdateStr = "", strFr = "", strTo = "", strLastSent = "";
+                statementdate = DateTime.ParseExact(txtStatementDate.Text, "dd/MM/yyyy", null);
+                statementdateStr = statementdate.ToString("yyyyMMdd");
                 strFr = txtCardCodeFr.Text.Equals("") ? "*" : txtCardCodeFr.Text;
                 strTo = txtCardCodeTo.Text.Equals("") ? "*" : txtCardCodeTo.Text;
                 strLastSent = ddlLastSent.SelectedValue.Equals("") ? "A" : ddlLastSent.SelectedValue;
 
-                SqlDataSource.SelectParameters.Add("DateFromStr", DateFromStr);
-                SqlDataSource.SelectParameters.Add("DateToStr", DateToStr);
+                SqlDataSource.SelectParameters.Add("statementdateStr", statementdateStr);
                 SqlDataSource.SelectParameters.Add("strFr", strFr);
                 SqlDataSource.SelectParameters.Add("strTo", strTo);
                 SqlDataSource.SelectParameters.Add("strLastSent", strLastSent);
 
+                LabelStmtDate.Text = " as at " + txtStatementDate.Text;
+
+                //solve re-search issue
+                initCheckStatus("", "BlankAll");
+                GridView1.Dispose();
                 GridView1.DataBind();
 
                 using (SqlConnection conn = new SqlConnection(Session["ConnString"].ToString()))
                 {
                     using (SqlDataAdapter dat = new SqlDataAdapter("", conn))
                     {
-                        query = "SELECT * FROM [FTS_fn_GetBPList_Receipt] ('" + DateFromStr + "', '" + DateToStr + "', '"
-                            + strFr + "', '" + strTo + "', '" + strLastSent + "') T0 ORDER BY T0.DocEntry ";
+                        query = "SELECT * FROM [FTS_fn_GetBPList_Statement] ('" + statementdateStr + "', '" + strFr + "', '" + strTo + "', '" + strLastSent + "') T0 ORDER BY T0.CardCode ";
 
                         dat.SelectCommand.CommandText = query;
                         SqlDataSource.SelectCommand = query;
@@ -172,7 +168,7 @@ namespace Web
                 ft_logs.WriteLine("Perform search error:" + ex.Message, "Error");
 
                 ft_dblogs logs = new ft_dblogs();
-                logs.Screen = "EmailReceipt";
+                logs.Screen = "EmailStatement";
                 logs.MessageType = "Error";
                 logs.Message = ex.Message;
                 logs.UserSign = lblUser.Text;
@@ -189,12 +185,14 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
+                return;
             }
 
             init();
-            if (ReceiptSelectedRow.Count <= 0)
+            StatementSelectedRow = getSelectedRows();
+            if (StatementSelectedRow.Count <= 0)
             {
-                LabelDanger.Text = "No document is selected!";
+                LabelDanger.Text = "No business partner is selected!";
                 return;
             }
 
@@ -239,8 +237,7 @@ namespace Web
             ft_logs.WriteLine("-- Log started at " + DateTime.Now.ToString("hh:mm:ss tt") + " --------------------------------------------", "");
             ft_logs.WriteLine("User:    " + lblUser.Text, "");
             ft_logs.WriteLine("Company: " + LabelCompany.Text, "");
-            ft_logs.WriteLine("Receipt Date From:  " + txtDateFrom.Text, "");
-            ft_logs.WriteLine("Receipt Date To:  " + txtDateTo.Text, "");
+            ft_logs.WriteLine("Statement Date:  " + txtStatementDate.Text, "");
             ft_logs.WriteLine("-------------------------------------------------------------------------------", "");
             // Core Function
             GenerateDocument();
@@ -252,7 +249,8 @@ namespace Web
             }
 
             inProcess = false;
-            ReceiptSelectedRow.Clear();
+            StatementSelectedRow.Clear();
+            LabelInfo.Text = "";
             ViewState["chkAll"] = null;
             SqlDataSource.SelectCommand = query;
             GridView1.DataBind();
@@ -269,19 +267,19 @@ namespace Web
         }
         protected void GenerateDocument()
         {
-            ft_logs.WriteLine("Generate Receipt begin...", "Info");
-            string todaydateStr = DateTime.Now.ToString("dd-MM-yyyy");
-            string layoutName = LabelCompany.Text + "_Receipt";
+            ft_logs.WriteLine("Generate statement begin...", "Info");
+            DateTime statementdate = DateTime.ParseExact(txtStatementDate.Text, "dd/MM/yyyy", null);
+            string statementdateStr = statementdate.ToString("yyyyMMdd");
+            string layoutName = LabelCompany.Text + "_Statement";
 
-
-            folderDir = "C:\\EmailPortal\\[" + LabelCompany.Text + "] " + lblUser.Text + "\\Receipt\\" + todaydateStr;
+            folderDir = "C:\\EmailPortal\\[" + LabelCompany.Text + "] " + lblUser.Text + "\\Statement\\" + statementdate.ToString("dd-MM-yyyy");
 
             try
             {
-                ft_logs.WriteLine("① Clear attachment folder...", "Info");
-                foreach (string DocEntry in ReceiptSelectedRow.Select(x => x.DocEntry.ToString()).Distinct())
+                ft_logs.WriteLine("? Clear attachment folder...", "Info");
+                foreach (string CardCode in StatementSelectedRow.Select(x => x.CardCode).Distinct())
                 {
-                    string path = folderDir + "\\" + DocEntry + "\\";
+                    string path = folderDir + "\\" + CardCode + "\\";
                     if (Directory.Exists(path))
                     {
                         Directory.Delete(folderDir, true);
@@ -290,8 +288,7 @@ namespace Web
             }
             catch (IOException ex)
             {
-                info = "Clear attachment error:" + ex.Message;
-                LabelDanger.Text = info;
+                LabelDanger.Text = "Clear attachment error:" + ex.Message;
                 ft_logs.WriteLine(info, "Error");
                 return;
             }
@@ -301,24 +298,22 @@ namespace Web
             {
                 bool Checked;
 
-                for (int i = 0; i < ReceiptSelectedRow.Count; i++)
+                for (int i = 0; i < StatementSelectedRow.Count; i++)
                 {
-                    Checked = ReceiptSelectedRow[i].isChecked;
+                    Checked = StatementSelectedRow[i].isChecked;
 
                     if (Checked)
                     {
-                        int DocEntry = ReceiptSelectedRow[i].DocEntry;
-                        string DocNum = ReceiptSelectedRow[i].SAPDocNo;
-                        string CardCode = ReceiptSelectedRow[i].CardCode;
-                        string CardName = ReceiptSelectedRow[i].CardName;
+                        string CardCode = StatementSelectedRow[i].CardCode;
+                        string CardName = StatementSelectedRow[i].CardName;
 
-                        string path = folderDir + "\\" + DocEntry + "\\";
+                        string path = folderDir + "\\" + CardCode + "\\";
                         if (!Directory.Exists(path))
                         {
                             Directory.CreateDirectory(path);
                         }
 
-                        info = "③ Generate Receipt [" + (i + 1).ToString() + "/" + ReceiptSelectedRow.Count() + "] ➜ [" + CardCode + "-" + CardName + "-" + DocNum + "]";
+                        LabelLoading.Text = "? Generate Statement [" + (i + 1).ToString() + "/" + StatementSelectedRow.Count() + "] ? [" + CardCode + "-" + CardName + "]";
                         ft_logs.Write(info, "Info");
 
                         string regexSearch = new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars());
@@ -328,22 +323,34 @@ namespace Web
                         ReportDocument crystalReport = new ReportDocument();
                         crystalReport.Load(Server.MapPath("~/Reports/" + layoutName + ".rpt"));
 
-                        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(Session["SAPDBConnString"].ToString());
-                        crystalReport.DataSourceConnections[0].SetConnection(builder.DataSource, builder.InitialCatalog, builder.UserID, builder.Password);
+                        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(Session["ConnString"].ToString());
+                        crystalReport.DataSourceConnections[0].SetConnection(builder.DataSource, Session["SAPDB"].ToString(), builder.UserID, builder.Password);
 
                         ParameterFieldDefinitions crParameterdef;
                         crParameterdef = crystalReport.DataDefinition.ParameterFields;
 
                         foreach (ParameterFieldDefinition param in crParameterdef)
                         {
-                            if (param.Name.Equals("DocKey@"))
+                            if (param.Name.Equals("StatementDate"))
                             {
-                                crystalReport.SetParameterValue("DocKey@", DocEntry);
+                                crystalReport.SetParameterValue("StatementDate", statementdate.ToString("yyyy-MM-dd"));
+                                continue;
+                            }
+
+                            if (param.Name.Equals("CardCode@FROM OCRD WHERE CardType = 'C'"))
+                            {
+                                crystalReport.SetParameterValue("CardCode@FROM OCRD WHERE CardType = 'C'", CardCode);
+                                continue;
+                            }
+
+                            if (param.Name.Equals("IncludeNoBal"))
+                            {
+                                crystalReport.SetParameterValue("IncludeNoBal", true);
                                 continue;
                             }
                         }
 
-                        string ExportPath = path + "RCT_" + CardCode + "_" + DocNum + ".pdf";
+                        string ExportPath = path + "SOA_" + CardCode + "_" + statementdate.ToString("yyyyMMdd") + ".pdf";
                         crystalReport.ExportToDisk(ExportFormatType.PortableDocFormat, ExportPath);
                         docPath.Add(ExportPath);
                         crystalReport.Dispose();
@@ -354,17 +361,18 @@ namespace Web
             catch (Exception ex)
             {
                 LabelDanger.Text = ex.Message;
-                ft_logs.WriteLine("Generating Receipt error:" + ex.Message, "Error");
+                ft_logs.WriteLine("Generating Statement error:" + ex.Message, "Error");
                 inProcess = false;
             }
             finally
             {
-                ft_logs.WriteLine("Generate Receipt ended!", "Info");
+                ft_logs.WriteLine("Generate Statement ended!", "Info");
             }
         }
+
         protected void SendEmail()
         {
-            ft_logs.WriteLine("✉ Send E-Mail Begin...", "Info");
+            ft_logs.WriteLine("? Send E-Mail Begin...", "Info");
             // Outgoing Mail Settings
             string smtp = WebConfigurationManager.AppSettings.Get("emailhost");
             string port = WebConfigurationManager.AppSettings.Get("emailport");
@@ -376,6 +384,8 @@ namespace Web
 
             Boolean ssl = Boolean.Parse(WebConfigurationManager.AppSettings["EnableSSL"].ToString());
 
+            DateTime statementdate = DateTime.ParseExact(txtStatementDate.Text, "dd/MM/yyyy", null);
+
             bool Checked;
 
             ft_email envelope = new ft_email();
@@ -384,7 +394,7 @@ namespace Web
             {
                 using (SqlDataAdapter dat = new SqlDataAdapter("", conn))
                 {
-                    dat.SelectCommand.CommandText = "SELECT * FROM ft_email_template_receipt WHERE isDefault = '1' ";
+                    dat.SelectCommand.CommandText = "SELECT * FROM ft_email_template_statement WHERE isDefault = '1' ";
                     DataTable dt = new DataTable();
                     dat.Fill(dt);
 
@@ -405,37 +415,34 @@ namespace Web
                 conn.Close();
             }
 
-            for (int i = 0; i < ReceiptSelectedRow.Count; i++)
+            for (int i = 0; i < StatementSelectedRow.Count; i++)
             {
-                ReceiptSelectedRow receiptSelectedObj = ReceiptSelectedRow[i];
-                Checked = receiptSelectedObj.isChecked;
+                StatementSelectedRow statementSelectedObj = StatementSelectedRow[i];
+                Checked = statementSelectedObj.isChecked;
 
                 if (Checked)
                 {
-                    string DocEntry = receiptSelectedObj.DocEntry.ToString();
-                    string DocNum = receiptSelectedObj.SAPDocNo;
-                    DateTime DocDate = receiptSelectedObj.DocDate;
-                    string CardCode = receiptSelectedObj.CardCode;
-                    string CardName = receiptSelectedObj.CardName;
+                    string CardCode = statementSelectedObj.CardCode;
+                    string CardName = statementSelectedObj.CardName;
 
-                    string to = receiptSelectedObj.EmailTo;
-                    string cc = receiptSelectedObj.EmailCC;
+                    string to = statementSelectedObj.EmailTo;
+                    string cc = statementSelectedObj.EmailCC;
 
-                    info = "④ Sending Receipt [" + (i + 1).ToString() + "/" + ReceiptSelectedRow.Count() + "] ➜ [" + CardCode + "-" + CardName + "-" + DocNum + "] TO: [" + to + "] CC: [" + cc + "]";
+                    LabelLoading.Text = "? Sending Statement [" + (i + 1).ToString() + "/" + StatementSelectedRow.Count() + "] ? [" + CardCode + "-" + CardName + "] TO: [" + to + "] CC: [" + cc + "]";
                     ft_logs.Write(info, "Info");
 
                     string subject = envelope.EmailSubject;
                     subject = subject.Replace(@"[CardName]", CardName);
-                    subject = subject.Replace(@"[DD]", DocDate.ToString("dd"));
-                    subject = subject.Replace(@"[MM]", DocDate.ToString("MM"));
-                    subject = subject.Replace(@"[MMM]", DocDate.ToString("MMM"));
-                    subject = subject.Replace(@"[YYYY]", DocDate.ToString("yyyy"));
+                    subject = subject.Replace(@"[DD]", statementdate.ToString("dd"));
+                    subject = subject.Replace(@"[MM]", statementdate.ToString("MM"));
+                    subject = subject.Replace(@"[MMM]", statementdate.ToString("MMM"));
+                    subject = subject.Replace(@"[YYYY]", statementdate.ToString("yyyy"));
 
                     string content = envelope.EmailContent;
-                    content = content.Replace(@"[DD]", DocDate.ToString("dd"));
-                    content = content.Replace(@"[MM]", DocDate.ToString("MM"));
-                    content = content.Replace(@"[MMM]", DocDate.ToString("MMM"));
-                    content = content.Replace(@"[YYYY]", DocDate.ToString("yyyy"));
+                    content = content.Replace(@"[DD]", statementdate.ToString("dd"));
+                    content = content.Replace(@"[MM]", statementdate.ToString("MM"));
+                    content = content.Replace(@"[MMM]", statementdate.ToString("MMM"));
+                    content = content.Replace(@"[YYYY]", statementdate.ToString("yyyy"));
 
                     string path = "";
 
@@ -462,7 +469,7 @@ namespace Web
                         oMail.IsBodyHtml = true;
 
                         List<string> attached = new List<string>();
-                        path = folderDir + "\\" + DocEntry + "\\";
+                        path = folderDir + "\\" + CardCode + "\\";
                         if (Directory.Exists(path))
                         {
                             string[] files = Directory.GetFiles(path, "*.pdf");
@@ -478,19 +485,19 @@ namespace Web
                         {
                             using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
                             {
-                                string query = "INSERT INTO ft_email_logs_receipt (DocEntry, DocNum, CardCode, CardName, EmailTo, EmailCC, " +
-                                "EmailSubject, EmailContent, ReceiptDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                                "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
-                                subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Failed', '" +
-                                "No attachment." + "');";
+                                string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
+                                "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
+                                "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                                statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
+                                Session["UserId"].ToString() + "', 'Failed', '" + "No attachment." + "');";
 
                                 SqlCommand command = new SqlCommand(query, connection);
                                 command.Connection.Open();
                                 command.ExecuteNonQuery();
                                 command.Connection.Close();
+
                             }
-                            info = "Send E-Mail Error:" + "No attachment.";
-                            LabelDanger.Text = info;
+                            LabelDanger.Text = "Send E-Mail Error:" + "No attachment.";
                             ft_logs.WriteLine(Environment.NewLine + info, "Error");
 
                             continue;
@@ -505,14 +512,16 @@ namespace Web
                         oSTMP.Dispose();
                         oMail.Attachments.Dispose();
 
-                        ft_logs.WriteLine("➜✉ E-Mail Sent " + CardCode + "-" + CardName + "-" + DocNum + " @ " + DateTime.Today.ToString("d MMM"), "");
+                        ft_logs.WriteLine("?? E-Mail Sent " + CardCode + "-" + CardName + " @ " + DateTime.Today.ToString("d MMM"), "");
 
                         using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
                         {
-                            string query = "INSERT INTO ft_email_logs_receipt (DocEntry, DocNum, CardCode, CardName, EmailTo, EmailCC, " +
-                            "EmailSubject, EmailContent, ReceiptDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
-                            subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Success', '');";
+                            string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
+                            "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
+                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
+                            Session["UserId"].ToString() + "', 'Success', '');";
+
                             SqlCommand command = new SqlCommand(query, connection);
                             command.Connection.Open();
                             command.ExecuteNonQuery();
@@ -523,28 +532,29 @@ namespace Web
                     {
                         using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
                         {
-                            string query = "INSERT INTO ft_email_logs_receipt (DocEntry, DocNum, CardCode, CardName, EmailTo, EmailCC, " +
-                            "EmailSubject, EmailContent, ReceiptDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
-                            subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Failed', '" +
-                            ex.Message + "');";
+                            string query = "INSERT INTO ft_email_logs_statement (CardCode, CardName, EmailTo, EmailCC, " +
+                            "EmailSubject, EmailContent, StatementDate, SendDate, SendBy, SendResult, ErrorDesc) " +
+                            "VALUES ('" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" + subject + "', '" + content + "', '" +
+                            statementdate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" +
+                            Session["UserId"].ToString() + "', 'Failed', '" + ex.Message + "');";
 
                             SqlCommand command = new SqlCommand(query, connection);
                             command.Connection.Open();
                             command.ExecuteNonQuery();
                             command.Connection.Close();
-                        }
 
-                        info = "Send E-Mail Error:" + ex.Message;
-                        LabelDanger.Text = info;
+                        }
+                        LabelDanger.Text = "Send E-Mail Error:" + ex.Message;
                         ft_logs.WriteLine(Environment.NewLine + info, "Error");
                         inProcess = false;
                     }
                 }
             }
             inProcess = false;
-            ft_logs.WriteLine("✉ Send E-Mail ended!", "Info");
+            ft_logs.WriteLine("? Send E-Mail ended!", "Info");
         }
+
+
         protected void btnExport_Click(object sender, EventArgs e)
         {
             DataView dv = SqlDataSource.Select(DataSourceSelectArguments.Empty) as DataView;
@@ -582,12 +592,12 @@ namespace Web
         {
             GenerateDocument();
 
-            DateTime statementdate = DateTime.ParseExact(txtDateTo.Text, "dd/MM/yyyy", null);
-            string ExportPath = Path.GetTempPath() + @"Combined_RCT @ " + statementdate.ToString("MMM\\'yy") + ".pdf";
+            DateTime statementdate = DateTime.ParseExact(txtStatementDate.Text, "dd/MM/yyyy", null);
+            string ExportPath = Path.GetTempPath() + @"Combined_SOA @ " + statementdate.ToString("MMM\\'yy") + ".pdf";
             int i = 0;
             while (System.IO.File.Exists(ExportPath))
             {
-                ExportPath = Path.GetTempPath() + @"Combined_RCT @ " + statementdate.ToString("MMM\\'yy") + "[" + (i++).ToString() + "].pdf";
+                ExportPath = Path.GetTempPath() + @"Combined_SOA @ " + statementdate.ToString("MMM\\'yy") + "[" + (i++).ToString() + "].pdf";
             }
             MergePDFs(ExportPath, docPath.ToArray());
 
@@ -609,7 +619,7 @@ namespace Web
         {
             GenerateDocument();
 
-            DateTime statementdate = DateTime.ParseExact(txtDateTo.Text, "dd/MM/yyyy", null);
+            DateTime statementdate = DateTime.ParseExact(txtStatementDate.Text, "dd/MM/yyyy", null);
             string ExportPath = Path.GetTempPath() + @"Combined_SOA @ " + statementdate.ToString("MMM\\'yy") + ".zip";
 
             if (File.Exists(ExportPath))
@@ -641,6 +651,7 @@ namespace Web
                 Response.End();
             }
         }
+
 
         private void MergePDFs(string outPutFilePath, params string[] filesPath)
         {
@@ -674,14 +685,45 @@ namespace Web
         {
             CheckBox chkAll = (CheckBox)sender;
             ViewState["chkAll"] = chkAll.Checked;
-            ReceiptSelectedRow = new List<ReceiptSelectedRow>();
+            StatementSelectedRow = new List<StatementSelectedRow>();
+
             if (chkAll.Checked)
             {
-                ReceiptSelectedRow = ReceiptSelectedRowAll;
+                foreach (GridViewRow row in GridView1.Rows)
+                {
+                    Label LabelCardcode = (Label)row.FindControl("LabelCardcode");
+                    Label LabelCardName = (Label)row.FindControl("CardName");
+                    Label LabelEmailTo = (Label)row.FindControl("lblEmailTo");
+                    Label LabelEmailCC = (Label)row.FindControl("lblEmailCC");
+
+                    StatementSelectedRowAll.Add(new StatementSelectedRow
+                    {
+                        CardCode = LabelCardcode.Text,
+                        CardName = LabelCardName.Text,
+                        EmailTo = LabelEmailTo.Text,
+                        EmailCC = LabelEmailCC.Text,
+                        isChecked = true
+
+                    });
+
+                    initCheckStatus(LabelCardcode.Text, "Add");
+                }
+
+                StatementSelectedRow = StatementSelectedRowAll;
             }
             else
             {
-                ReceiptSelectedRow.Clear();
+                foreach (GridViewRow row in GridView1.Rows)
+                {
+                    Label LabelCardcode = (Label)row.FindControl("LabelCardcode");
+                    initCheckStatus(LabelCardcode.Text, "Remove");
+
+                    StatementSelectedRow.RemoveAll(x => x.CardCode == LabelCardcode.Text);
+                    //insertToViewState(StatementSelectedRow);
+                }
+
+                // initCheckStatus("", "BlankAll"); //if want to blank globally use this
+                //StatementSelectedRow.Clear();
             }
         }
         protected void chkBox_CheckedChanged(object sender, EventArgs e)
@@ -690,41 +732,104 @@ namespace Web
             {
                 LabelDanger.Text = "You has been logged out!";
                 Response.Redirect("~/Default.aspx", false);
-            }
+                return;
 
+            }
             CheckBox chk = (CheckBox)sender;
             int selRowIndex = int.Parse(chk.Attributes["CommandArgument"]);
-            int docentry = int.Parse(GridView1.DataKeys[selRowIndex]["DocEntry"].ToString());
-            Label sapdocno = (Label)GridView1.Rows[selRowIndex].FindControl("lblSAPDocNo");
-            Label portaldocno = (Label)GridView1.Rows[selRowIndex].FindControl("lblPortalDocNo");
-            Label docdate = (Label)GridView1.Rows[selRowIndex].FindControl("lblDocDate");
-            Label cardcode = (Label)GridView1.Rows[selRowIndex].FindControl("LabelCardCode");
+            string cardcode = GridView1.DataKeys[selRowIndex]["CardCode"].ToString();
             Label cardname = (Label)GridView1.Rows[selRowIndex].FindControl("CardName");
             Label emailto = (Label)GridView1.Rows[selRowIndex].FindControl("lblEmailTo");
             Label emailcc = (Label)GridView1.Rows[selRowIndex].FindControl("lblEmailCC");
+            ArrayList chkStatus = null;
 
             if (chk.Checked)
             {
-                chk.Checked = true;
-                ReceiptSelectedRow.Add(new ReceiptSelectedRow
+                StatementSelectedRow.Add(new StatementSelectedRow
                 {
-                    DocEntry = docentry,
-                    SAPDocNo = sapdocno.Text,
-                    DocDate = DateTime.ParseExact(docdate.Text, "dd/MM/yyyy", null),
-                    CardCode = cardcode.Text,
+                    CardCode = cardcode,
                     CardName = cardname.Text,
                     EmailTo = emailto.Text,
                     EmailCC = emailcc.Text,
                     isChecked = chk.Checked
                 });
+                chkStatus = initCheckStatus(cardcode, "Add");
+
             }
             else
             {
-                ReceiptSelectedRow.RemoveAll(x => x.DocEntry == docentry);
+                //StatementSelectedRow.RemoveAll(x => x.CardCode == cardcode);
+                chkStatus = initCheckStatus(cardcode, "Remove");
+
             }
-            ReceiptSelectedRow.Select(x => x.DocEntry).Distinct();
-            LabelInfo.Text = "Selected : " + ReceiptSelectedRow.Count();
+
+            //StatementSelectedRow.Select(x => x.CardCode).Distinct();
+            LabelInfo.Text = "Selected : " + chkStatus.Count;
         }
+
+        protected ArrayList initCheckStatus(string CardCode, string Mode)
+        {
+            ArrayList CheckBoxArray = new ArrayList();
+
+            if (ViewState["CheckBoxArray"] != null)
+            {
+                CheckBoxArray = (ArrayList)ViewState["CheckBoxArray"];
+
+                if (!CheckBoxArray.Contains(CardCode))
+                {
+                    if (Mode == "Add")
+                    {
+                        CheckBoxArray.Add(CardCode);
+                    }
+                }
+                else
+                {
+                    if (Mode == "Remove")
+                    {
+                        CheckBoxArray.Remove(CardCode);
+                    }
+                    else if (Mode == "Get")
+                    {
+                        return CheckBoxArray;
+                    }
+                }
+                ViewState["CheckBoxArray"] = CheckBoxArray;
+            }
+            else
+            {
+                if (Mode == "Add")
+                {
+                    CheckBoxArray = new ArrayList();
+                    CheckBoxArray.Add(CardCode);
+                    ViewState["CheckBoxArray"] = CheckBoxArray;
+                }
+            }
+            //if want to blank globally use this
+            if (Mode == "BlankAll")
+            {
+                CheckBoxArray = new ArrayList();
+                ViewState["CheckBoxArray"] = CheckBoxArray;
+            }
+            LabelInfo.Text = "Selected records : " + CheckBoxArray.Count;
+            return CheckBoxArray;
+        }
+
+        protected List<StatementSelectedRow> getSelectedRows()
+        {
+            //Gget all checked cardCode only when you need to send email save resources.
+            List<StatementSelectedRow> AllRows = StatementSelectedRowAll;
+            AllRows = (List<StatementSelectedRow>)ViewState["StatementSelectedRowAll"];
+
+            List<StatementSelectedRow> selectedRows = new List<StatementSelectedRow>();
+            ArrayList CheckBoxArray = (ArrayList)ViewState["CheckBoxArray"];
+            foreach (string cardcode in CheckBoxArray)
+            {
+                StatementSelectedRow CardCode = AllRows.Find(x => x.CardCode == cardcode);
+                selectedRows.Add(CardCode);
+            }
+            return selectedRows;
+        }
+
         // -- Web Page Rendering -----------------------------------------------------------------------
         protected void SqlDataSource_Selected(object sender, SqlDataSourceStatusEventArgs e)
         {
@@ -734,58 +839,88 @@ namespace Web
             pagerInfo = " " + First + " - " + Last + " of " + totalRecords + " items";
             LabelPrimary.Text = pagerInfo;
         }
+        protected void GridView1_OnPaging(object sender, GridViewPageEventArgs e)
+        {
+            GridView1.PageIndex = e.NewPageIndex;
+            GridView1.DataBind();
+            if (ViewState["CheckBoxArray"] != null)
+            {
+                ArrayList CheckBoxArray = (ArrayList)ViewState["CheckBoxArray"];
+                string checkAllIndex = "chkAll-" + GridView1.PageIndex;
+
+                if (CheckBoxArray.IndexOf(checkAllIndex) != -1)
+                {
+                    foreach (GridViewRow row in GridView1.Rows)
+                    {
+                        Label LabelCardcode = (Label)row.FindControl("LabelCardcode");
+                        Label LabelCardName = (Label)row.FindControl("CardName");
+                        Label LabelEmailTo = (Label)row.FindControl("lblEmailTo");
+                        Label LabelEmailCC = (Label)row.FindControl("lblEmailCC");
+
+                        if (CheckBoxArray.Contains(LabelCardcode.Text))
+                        {
+                            CheckBox chkBox = (CheckBox)row.FindControl("chkBox");
+                            chkBox.Checked = true;
+                        }
+                    }
+                }
+            }
+        }
         protected void GridView1_PreRender(object sender, EventArgs e)
         {
             if (inProcess) { return; }
 
-            ReceiptSelectedRowAll = new List<ReceiptSelectedRow>();
+            StatementSelectedRowAll = new List<StatementSelectedRow>();
             GridView1.AllowPaging = false;
             totalRecords = GridView1.Rows.Count;
             foreach (GridViewRow row in GridView1.Rows)
             {
-                Label lblDocEntry = (Label)row.FindControl("lblDocEntry");
-                Label lblSAPDocNo = (Label)row.FindControl("lblSAPDocNo");
-                Label lblPortalDocNo = (Label)row.FindControl("lblPortalDocNo");
-                Label lblDocDate = (Label)row.FindControl("lblDocDate");
                 Label LabelCardcode = (Label)row.FindControl("LabelCardcode");
                 Label LabelCardName = (Label)row.FindControl("CardName");
                 Label LabelEmailTo = (Label)row.FindControl("lblEmailTo");
                 Label LabelEmailCC = (Label)row.FindControl("lblEmailCC");
                 CheckBox chkBox = (CheckBox)row.FindControl("chkBox");
 
-                ReceiptSelectedRowAll.Add(new ReceiptSelectedRow
+                StatementSelectedRowAll.Add(new StatementSelectedRow
                 {
-                    DocEntry = int.Parse(lblDocEntry.Text),
-                    SAPDocNo = lblSAPDocNo.Text,
-                    DocDate = DateTime.ParseExact(lblDocDate.Text, "dd/MM/yyyy", null),
                     CardCode = LabelCardcode.Text,
                     CardName = LabelCardName.Text,
                     EmailTo = LabelEmailTo.Text,
                     EmailCC = LabelEmailCC.Text,
-                    isChecked = true
+                    isChecked = chkBox.Checked
                 });
             }
+
+            // Packing all generated cardCode for later use.
+            if (ViewState["StatementSelectedRowAll"] == null)
+            {
+                ViewState["StatementSelectedRowAll"] = new List<StatementSelectedRow>();
+            }
+            ViewState["StatementSelectedRowAll"] = StatementSelectedRowAll;
+
             GridView1.AllowPaging = true;
         }
         protected void GridView1_RowDataBound(object sender, GridViewRowEventArgs e)
         {
             //Populate check box from ViewState
             if (GridView1 != null)
-            { 
+            {
                 if (ViewState["chkAll"] != null)
                 {
                     CheckBox chkAll = (CheckBox)GridView1.HeaderRow.FindControl("chkAll");
                     chkAll.Checked = (Boolean)ViewState["chkAll"];
 
-                    if (ReceiptSelectedRow.Count() == 0)
+                    if (StatementSelectedRow.Count() == 0)
                     {
                         chkAll.Checked = false;
                     }
-                    if (ReceiptSelectedRow.Count() == ReceiptSelectedRowAll.Count())
+                    if (StatementSelectedRow.Count() == StatementSelectedRowAll.Count())
                     {
                         chkAll.Checked = true;
                     }
                 }
+
+
             }
             if (e.Row.RowType == DataControlRowType.DataRow)
             {
@@ -828,6 +963,13 @@ namespace Web
                         chkBox.Enabled = false;
                     }
                 }
+
+
+
+
+
+
+
             }
         }
         protected void GridView1_RowCreated(object sender, GridViewRowEventArgs e)
@@ -877,21 +1019,26 @@ namespace Web
         protected void GridView1_DataBound(object sender, EventArgs e)
         {
             if (dt == null) return;
+            ArrayList checkStatus = initCheckStatus("", "Get");
             for (int i = 0; i < GridView1.Rows.Count; i++)
             {
                 CheckBox chkBox = (CheckBox)GridView1.Rows[i].FindControl("chkBox");
-                Label lblDocEntry = (Label)GridView1.Rows[i].FindControl("lblDocEntry");
+                Label LabelCardcode = (Label)GridView1.Rows[i].FindControl("LabelCardcode");
+                Label LabelLastSent = (Label)GridView1.Rows[i].FindControl("lblLastSent");
+                Label LabelDanger = (Label)GridView1.Rows[i].FindControl("LabelDanger");
+                Label LabelWarning = (Label)GridView1.Rows[i].FindControl("LabelWarning");
+                Label LabelInfo = (Label)GridView1.Rows[i].FindControl("LabelInfo");
 
-                int docentry = int.Parse(lblDocEntry.Text.Trim());
+                string cardcode = LabelCardcode.Text.Trim();
 
                 // ChkBox Rendering
-                if (ReceiptSelectedRow.Exists(x => x.DocEntry == docentry) && !chkBox.Enabled)
+                if (StatementSelectedRow.Exists(x => x.CardCode == cardcode) && !chkBox.Enabled)
                 {
-                    ReceiptSelectedRow.RemoveAll(x => x.DocEntry == docentry);
-                    ReceiptSelectedRowAll.RemoveAll(x => x.DocEntry == docentry);
+                    StatementSelectedRow.RemoveAll(x => x.CardCode == cardcode);
+                    StatementSelectedRowAll.RemoveAll(x => x.CardCode == cardcode);
                     chkBox.Checked = false;
                 }
-                else if (ReceiptSelectedRow.Exists(x => x.DocEntry == docentry) && chkBox.Enabled)
+                else if (StatementSelectedRow.Exists(x => x.CardCode == cardcode) && chkBox.Enabled)
                 {
                     chkBox.Checked = true;
                 }
@@ -899,13 +1046,18 @@ namespace Web
                 {
                     chkBox.Checked = false;
                 }
-            }
 
-            if (ReceiptSelectedRow.Count() > 0)
+                //this is where the fucking tick and untick happened.....
+                if (checkStatus.Contains(cardcode)) chkBox.Checked = true; else chkBox.Checked = false;
+
+            }
+            if (StatementSelectedRow.Count() > 0)
             {
-                LabelInfo.Text = "Selected records : " + ReceiptSelectedRow.Count();
+                checkStatus = initCheckStatus("", "Get");
+                //LabelInfo.Text = "Selected records : " + StatementSelectedRow.Count();
             }
         }
+
         protected void btnRefresh_Click(object sender, EventArgs e)
         {
             init();
@@ -924,11 +1076,10 @@ namespace Web
         }
         protected void refresh()
         {
-
-            DateTime statementdate = DateTime.ParseExact(txtDateTo.Text, "dd/MM/yyyy", null);
+            DateTime statementdate = DateTime.ParseExact(txtStatementDate.Text, "dd/MM/yyyy", null);
             string statementdateStr = statementdate.ToString("yyyyMMdd");
             // Special For SSB
-            info = "② Updating [" + LabelCompany.Text + "] statement table...";
+            info = "? Updating [" + LabelCompany.Text + "] statement table...";
             ft_logs.Write(info, "Info");
 
             // Switch Connection

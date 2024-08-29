@@ -62,7 +62,6 @@ namespace Web
 
             if (!Page.IsPostBack)
             {
-
                 lblUser.Text = Session["UserId"].ToString();
 
                 txtSendDateFr.Text = DateTime.Now.ToString("dd/MM/yyyy");
@@ -73,6 +72,9 @@ namespace Web
                 dt = null;
                 GridView1.DataSource = null;
                 GridView1.DataBind();
+
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void btnSelect_Click(object sender, EventArgs e)
@@ -212,11 +214,13 @@ namespace Web
             }
 
             Timer1.Enabled = true;
-            btnSend.Enabled = false;
             imgLoading.Visible = true;
             info = "App starting...";
             try
             {
+                btnSend.Enabled = false;
+                btnSearch.Enabled = false;
+
                 Thread workerThread = new Thread(new ThreadStart(MainTask));
                 workerThread.Start();
             }
@@ -224,6 +228,11 @@ namespace Web
             {
                 LabelDanger.Text = ex.Message;
                 info = ex.Message;
+            }
+            finally
+            {
+                btnSend.Enabled = true;
+                btnSearch.Enabled = true;
             }
         }
         protected void btnRefresh_Click(object sender, EventArgs e)
@@ -405,11 +414,13 @@ namespace Web
                     string subject = lreceiptSelectedObj.EmailSubject;
                     subject = subject.Replace(@"[CardName]", CardName);
                     subject = subject.Replace(@"[DD]", DocDate.ToString("dd"));
+                    subject = subject.Replace(@"[MM]", DocDate.ToString("MM"));
                     subject = subject.Replace(@"[MMM]", DocDate.ToString("MMM"));
                     subject = subject.Replace(@"[YYYY]", DocDate.ToString("yyyy"));
 
                     string content = lreceiptSelectedObj.EmailContent;
                     content = content.Replace(@"[DD]", DocDate.ToString("dd"));
+                    content = content.Replace(@"[MM]", DocDate.ToString("MM"));
                     content = content.Replace(@"[MMM]", DocDate.ToString("MMM"));
                     content = content.Replace(@"[YYYY]", DocDate.ToString("yyyy"));
 
@@ -450,6 +461,28 @@ namespace Web
                             }
                         }
 
+                        if (oMail.Attachments.Count <= 0)
+                        {
+                            using (SqlConnection connection = new SqlConnection(Session["ConnString"].ToString()))
+                            {
+                                string query = "INSERT INTO ft_email_logs_receipt (DocEntry, DocNum, CardCode, CardName, EmailTo, EmailCC, " +
+                                "EmailSubject, EmailContent, ReceiptDate, SendDate, SendBy, SendResult, ErrorDesc) " +
+                                "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
+                                subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Failed', '" +
+                                "No attachment." + "');";
+
+                                SqlCommand command = new SqlCommand(query, connection);
+                                command.Connection.Open();
+                                command.ExecuteNonQuery();
+                                command.Connection.Close();
+                            }
+                            info = "Send E-Mail Error:" + "No attachment.";
+                            LabelDanger.Text = info;
+                            ft_logs.WriteLine(Environment.NewLine + info, "Error");
+
+                            continue;
+                        }
+
                         SmtpClient oSTMP = new SmtpClient();
                         oSTMP.Host = smtp;
                         oSTMP.Port = int.Parse(port);
@@ -465,8 +498,8 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_receipt (DocEntry, DocNum, CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, ReceiptDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" +
-                            subject + "', '" + content + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Success', '');";
+                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
+                            subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Success', '');";
 
                             SqlCommand command = new SqlCommand(query, connection);
                             command.Connection.Open();
@@ -480,8 +513,8 @@ namespace Web
                         {
                             string query = "INSERT INTO ft_email_logs_receipt (DocEntry, DocNum, CardCode, CardName, EmailTo, EmailCC, " +
                             "EmailSubject, EmailContent, ReceiptDate, SendDate, SendBy, SendResult, ErrorDesc) " +
-                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + CardCode + "', '" + CardName + "', '" + to + "', '" + cc + "', '" +
-                            subject + "', '" + content + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Failed', '" +
+                            "VALUES ('" + DocEntry + "', '" + DocNum + "', '" + CardCode.Replace("'", "''") + "', '" + CardName.Replace("'", "''") + "', '" + to + "', '" + cc + "', '" +
+                            subject.Replace("'", "''") + "', '" + content.Replace("'", "''") + "', '" + DocDate.ToString("yyyy-MM-dd") + "', '" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") + "', '" + Session["UserId"].ToString() + "', 'Failed', '" +
                             ex.Message + "');";
 
                             SqlCommand command = new SqlCommand(query, connection);
@@ -497,6 +530,7 @@ namespace Web
                     }
                 }
             }
+            inProcess = false;
             ft_logs.WriteLine("✉ Send E-Mail ended!", "Info");
         }
         protected void init()
@@ -686,10 +720,15 @@ namespace Web
             if (e.Row.RowType == DataControlRowType.Pager)
             {
                 DropDownList DDL = new DropDownList();
-                DDL.Items.Add("5");
                 DDL.Items.Add("10");
-                DDL.Items.Add("15");
                 DDL.Items.Add("20");
+                DDL.Items.Add("30");
+                DDL.Items.Add("40");
+                DDL.Items.Add("50");
+                DDL.Items.Add("60");
+                DDL.Items.Add("70");
+                DDL.Items.Add("80");
+                DDL.Items.Add("90");
                 DDL.Items.Add("100");
                 DDL.AutoPostBack = true;
                 DDL.SelectedValue = GridView1.PageSize.ToString();
